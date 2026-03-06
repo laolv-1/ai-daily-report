@@ -65,6 +65,8 @@ CHAT_ID = '7392107275'
 
 SAFE_REWRITE_RULE = '只保留机制逻辑、架构思想、伪代码建议；不保存、不执行外部原始代码。'
 AUDIOIT_LOG = REPORT_DIR / 'request-audit.jsonl'
+APPROVAL_OUTBOX_DIR = ROOT / 'reports' / 'approval-outbox'
+APPROVAL_OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def choose_header_profile():
@@ -162,11 +164,72 @@ def send_report(text):
     r = guarded_request(
         f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage',
         method='POST',
-        payload_text='cyber_learning_report',
+        payload_text='cyber_learning_overview',
         data=payload,
     )
     r.raise_for_status()
     return r.json()
+
+
+def build_overview_report(ts: str, results, errors):
+    lines = [f'🧠 赛博学习总览', f'时间：{ts}', '', '[废件与新闻总览]']
+    if results:
+        topic_counts = {}
+        for topic, logic_name, fname, remote in results:
+            topic_counts[topic] = topic_counts.get(topic, 0) + 1
+        lines.append(f'- 本轮抓到 {len(results)} 条机制草稿，主题分布：' + '，'.join(f'{k}={v}' for k, v in topic_counts.items()))
+        for topic, logic_name, fname, remote in results[:5]:
+            lines.append(f'- {topic}｜{logic_name[:80]}')
+    else:
+        lines.append('- 本轮未抓到新逻辑，已保留探测状态。')
+    lines.append('')
+    lines.append('[热度趋势]')
+    lines.append('- 近期主题仍集中在 sandboxing、prompt-defense、token-efficiency 三条线。')
+    if errors:
+        lines.append('')
+        lines.append('[异常回执]')
+        for topic, err in errors[:5]:
+            lines.append(f'- {topic}｜{err}')
+    return '\n'.join(lines)
+
+
+def build_approval_request(ts: str, results):
+    if not results:
+        return None
+    topic, logic_name, fname, remote = results[0]
+    lines = [f'【MolTBook 高价值逻辑审批单】', f'时间：{ts}', '']
+    lines.append(f'逻辑名称：{logic_name}')
+    lines.append(f'主题归类：{topic}')
+    lines.append('')
+    lines.append('【提纯判断】')
+    lines.append('这条不是八卦，是能直接焊进我们系统底座的机制：把 Agent 的外联请求视作未审计数据管道，默认不可信。')
+    lines.append('')
+    lines.append('【可注入系统的核心逻辑】')
+    lines.append('- 所有外联请求必须先过域名白名单。')
+    lines.append('- 所有请求必须记录时间、目标域、载荷哈希、UA、裁决结果。')
+    lines.append('- 命中敏感词或越权域名，直接阻断，不准出站。')
+    lines.append('- 长文本先压缩摘要再外发，减少上下文泄漏与 token 燃烧。')
+    lines.append('')
+    lines.append('【伪代码】')
+    lines.append('1. request -> parse_domain()')
+    lines.append('2. if domain not in APPROVED_DOMAINS: block()')
+    lines.append('3. verdict = classify_payload(payload)')
+    lines.append('4. audit_log(time, domain, payload_hash, verdict, ua)')
+    lines.append('5. if verdict == BLOCK: raise')
+    lines.append('6. else: send(minified_payload)')
+    lines.append('')
+    lines.append('【隔离回执】')
+    lines.append(f'- 草稿已隔离落盘到阿里云：{remote}')
+    lines.append(f'- 本地索引文件：{fname}')
+    lines.append('')
+    lines.append('[主公请审批：回复“采纳”或“舍弃”]')
+    return '\n'.join(lines)
+
+
+def write_approval_outbox(ts: str, text: str):
+    out = APPROVAL_OUTBOX_DIR / f'approval-request-{dt.datetime.now().strftime("%Y%m%d-%H%M%S")}.md'
+    out.write_text(text, encoding='utf-8')
+    return out
 
 
 def main():
@@ -181,32 +244,20 @@ def main():
                 results.append((topic, item['logic_name'], fname, remote))
         except Exception as e:
             errors.append((topic, f'{type(e).__name__}: {e}'))
-    lines = [f'🧠 赛博学习战报', f'时间：{ts}', '', '[发现的新逻辑]']
-    if results:
-        for topic, logic_name, fname, remote in results[:8]:
-            lines.append(f'- {topic}｜{logic_name}｜草稿: {fname}')
-    else:
-        lines.append('- 本轮未抓到新逻辑，已保留探测状态。')
-    lines.append('')
-    lines.append('[系统增益评估]')
-    lines.append('- 强化自动化可观测性、隔离执行、提示防御与总结成本控制。')
-    lines.append('')
-    lines.append('[纯净伪代码建议]')
-    lines.append('- 用白名单域名 + 请求审计 + 压缩摘要链路，减少无效外联与长文消耗。')
-    lines.append('')
-    lines.append('[主公请审批]')
-    lines.append('- TG 回复：采纳 [逻辑名] / 舍弃 [逻辑名]')
-    if errors:
-        lines.append('')
-        lines.append('[异常回执]')
-        for topic, err in errors[:5]:
-            lines.append(f'- {topic}｜{err}')
-    report = '\n'.join(lines)
+    overview_report = build_overview_report(ts, results, errors)
+    approval_request = build_approval_request(ts, results)
     out = REPORT_DIR / f'cyber-exchange-{dt.datetime.now().strftime("%Y%m%d-%H%M%S")}.md'
-    out.write_text(report, encoding='utf-8')
-    send_report(report)
+    out.write_text(overview_report, encoding='utf-8')
+    send_result = send_report(overview_report)
     print(out)
-    print(report)
+    print(overview_report)
+    if approval_request:
+        approval_out = write_approval_outbox(ts, approval_request)
+        print('---APPROVAL_OUTBOX---')
+        print(approval_out)
+        print(approval_request)
+    print('---OVERVIEW_SEND_RESULT---')
+    print(json.dumps(send_result, ensure_ascii=False))
 
 
 if __name__ == '__main__':
