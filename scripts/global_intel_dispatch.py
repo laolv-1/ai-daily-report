@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sys
+import time
 from io import StringIO
 from pathlib import Path
 
@@ -13,7 +14,9 @@ import requests
 
 ROOT = Path('/root/.openclaw/workspace')
 REPORT_DIR = ROOT / 'reports'
+SEND_LOG_DIR = ROOT / 'reports' / 'send-logs'
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
+SEND_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 ALIYUN_HOST = os.getenv('ALIYUN_HOST', '100.82.179.92')
 ALIYUN_USER = os.getenv('ALIYUN_USER', 'root')
@@ -23,6 +26,9 @@ ALIYUN_MYSQL_PASSWORD = os.getenv('ALIYUN_MYSQL_PASSWORD', '7c8a1c78902e5035')
 MODEL_BASE = os.getenv('LCK_BASE_URL', 'http://74.48.182.210:8317/v1')
 MODEL_KEY = os.getenv('LCK_API_KEY', 'xDjn0xIm6ztThd8pSexN8CmCRttLtt8T')
 MODEL_NAME = os.getenv('LCK_MODEL', 'gpt-5.4')
+
+TELEGRAM_BOT_TOKEN = os.getenv('LAFU_BOT_TOKEN', '8545151429:AAGTiHUsUsH_VkYEtswD3I2v_7pDV9DO8S0')
+TELEGRAM_CHAT_ID = os.getenv('LAFU_CHAT_ID', '7392107275')
 
 SUBREDDITS = [
     ('SaaS', 'hot'),
@@ -36,7 +42,8 @@ KEYWORDS_GOOD = [
     'detection', 'account', 'risk', 'security', 'malware', 'bot', 'refund', 'policy'
 ]
 KEYWORDS_BAD = [
-    'meme', 'shitpost', 'roast', 'hiring', 'career', 'weekly thread', 'off topic', 'funny'
+    'meme', 'shitpost', 'roast', 'hiring', 'career', 'weekly thread', 'off topic', 'funny',
+    'monthly post', 'mentorship monday', 'deals + offers', 'iptv'
 ]
 
 
@@ -50,9 +57,9 @@ def score_post(p: dict) -> int:
             ups += 18
     for kw in KEYWORDS_BAD:
         if kw in title:
-            ups -= 25
+            ups -= 80
     if p.get('stickied'):
-        ups -= 20
+        ups -= 40
     if p.get('over_18'):
         ups -= 10
     return ups
@@ -64,6 +71,7 @@ def fetch_reddit(limit_per_sub: int = 10):
         'Accept': 'application/json',
     }
     picked = []
+    seen = set()
     for sub, mode in SUBREDDITS:
         urls = [
             f'https://www.reddit.com/r/{sub}/{mode}.json&limit={limit_per_sub}&raw_json=1' if '?' in mode else f'https://www.reddit.com/r/{sub}/{mode}.json?limit={limit_per_sub}&raw_json=1',
@@ -85,17 +93,21 @@ def fetch_reddit(limit_per_sub: int = 10):
             continue
         for item in data:
             p = item['data']
+            permalink = p.get('permalink', '')
+            if permalink in seen:
+                continue
+            seen.add(permalink)
             post = {
                 'subreddit': sub,
                 'title': p.get('title', ''),
-                'url': 'https://reddit.com' + p.get('permalink', ''),
+                'url': 'https://reddit.com' + permalink,
                 'score': int(p.get('score') or 0),
                 'comments': int(p.get('num_comments') or 0),
                 'created': dt.datetime.fromtimestamp(p.get('created_utc', 0)).strftime('%Y-%m-%d %H:%M'),
                 'selftext': re.sub(r'\s+', ' ', (p.get('selftext') or ''))[:500],
             }
             post['signal_score'] = score_post(p)
-            if post['signal_score'] >= 20:
+            if post['signal_score'] >= 40:
                 picked.append(post)
     picked.sort(key=lambda x: (x['signal_score'], x['score'], x['comments']), reverse=True)
     return picked[:8]
@@ -109,8 +121,12 @@ def ssh_exec(host: str, user: str, password: str, cmd: str, timeout: int = 30) -
     out = stdout.read().decode('utf-8', 'ignore')
     err = stderr.read().decode('utf-8', 'ignore')
     cli.close()
-    if err.strip() and 'Using a password on the command line interface can be insecure.' not in err:
-        raise RuntimeError(err)
+    cleaned_err = '\n'.join(
+        line for line in err.splitlines()
+        if 'Using a password on the command line interface can be insecure.' not in line
+    ).strip()
+    if cleaned_err:
+        raise RuntimeError(cleaned_err)
     return out
 
 
@@ -119,7 +135,8 @@ def fetch_domestic(limit: int = 8):
         "SELECT id,category,source,title,url,anxiety_score,"
         "DATE_FORMAT(COALESCE(published_at,created_at),'%Y-%m-%d %H:%i') "
         "FROM intel_station.intel_articles "
-        "WHERE COALESCE(published_at,created_at)>=DATE_SUB(NOW(),INTERVAL 72 HOUR) "
+        "WHERE push_status=0 "
+        "AND COALESCE(published_at,created_at)>=DATE_SUB(NOW(),INTERVAL 72 HOUR) "
         "ORDER BY anxiety_score DESC, COALESCE(published_at,created_at) DESC "
         f"LIMIT {limit};"
     )
@@ -140,6 +157,16 @@ def fetch_domestic(limit: int = 8):
             'created': row[6],
         })
     return rows
+
+
+def mark_domestic_pushed(domestic):
+    ids = [str(x['id']) for x in domestic if x.get('id')]
+    if not ids:
+        return 'SKIP:NO_IDS'
+    sql = f"UPDATE intel_station.intel_articles SET push_status=1 WHERE id IN ({','.join(ids)}); SELECT ROW_COUNT();"
+    cmd = f"mysql -uroot -p'{ALIYUN_MYSQL_PASSWORD}' -Nse \"{sql}\""
+    out = ssh_exec(ALIYUN_HOST, ALIYUN_USER, ALIYUN_PASSWORD, cmd, timeout=40).strip()
+    return out or 'OK'
 
 
 def summarize_with_model(domestic, reddit):
@@ -183,7 +210,7 @@ def fallback_summary(domestic, reddit):
 
 def render_report(domestic, reddit, summary):
     now = dt.datetime.now().strftime('%Y-%m-%d %H:%M %Z')
-    lines = [f'🔥 全球双擎情报日报', f'生成时间：{now}', '']
+    lines = [f'🔥 来福双擎情报日报', f'生成时间：{now}', '']
     lines.append('## 深度总结')
     lines.append(summary)
     lines.append('')
@@ -195,6 +222,40 @@ def render_report(domestic, reddit, summary):
     for item in reddit:
         lines.append(f"- [r/{item['subreddit']}] {item['title']}｜热度 {item['score']}｜评论 {item['comments']}｜信号分 {item['signal_score']}｜{item['created']}\n  {item['url']}")
     return '\n'.join(lines)
+
+
+def archive_send_log(ts: str, payload: dict, response_text: str, status_code: int):
+    path = SEND_LOG_DIR / f'telegram-send-{ts}.json'
+    path.write_text(json.dumps({
+        'timestamp': ts,
+        'payload': payload,
+        'status_code': status_code,
+        'response_text': response_text,
+    }, ensure_ascii=False, indent=2), encoding='utf-8')
+    return path
+
+
+def send_to_laifu(report: str, ts: str):
+    url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage'
+    payload = {
+        'chat_id': TELEGRAM_CHAT_ID,
+        'text': report[:3500],
+        'disable_web_page_preview': True,
+    }
+    last_err = None
+    for attempt in range(1, 4):
+        try:
+            r = requests.post(url, data=payload, timeout=30)
+            archive_send_log(ts, payload, r.text, r.status_code)
+            r.raise_for_status()
+            data = r.json()
+            if not data.get('ok'):
+                raise RuntimeError(r.text)
+            return data
+        except Exception as e:
+            last_err = e
+            time.sleep(2 * attempt)
+    raise RuntimeError(f'Telegram send failed after retries: {last_err}')
 
 
 def main():
@@ -210,9 +271,14 @@ def main():
     latest = REPORT_DIR / 'global-intel-latest.md'
     out.write_text(report, encoding='utf-8')
     latest.write_text(report, encoding='utf-8')
+    send_result = send_to_laifu(report, ts)
+    mark_result = mark_domestic_pushed(domestic)
     print(str(out))
-    print('---REPORT---')
-    print(report)
+    print('---RESULT---')
+    print(f'TELEGRAM_OK chat_id={TELEGRAM_CHAT_ID} message_id={send_result["result"]["message_id"]}')
+    print(f'PUSH_STATUS_WRITEBACK {mark_result}')
+    print(f'DOMESTIC_COUNT {len(domestic)}')
+    print(f'REDDIT_COUNT {len(reddit)}')
 
 
 if __name__ == '__main__':
