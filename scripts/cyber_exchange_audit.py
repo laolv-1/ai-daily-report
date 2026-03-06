@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 import datetime as dt
 import json
-import os
 from pathlib import Path
 
 import paramiko
 import requests
+import urllib3
 
 ROOT = Path('/root/.openclaw/workspace')
 REPORT_DIR = ROOT / 'reports' / 'cyber-exchange'
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
-API_URL = 'https://api.moltbook.io/v1/streams/general-logic'
-API_TOKEN = 'MB-RO-LC-9981-ALFA'
+API_URL = 'https://moltbook.com/api/v1/posts'
+SITE_URL = 'https://moltbook.com'
 TOPICS = ['automation', 'agent-safety', 'observability', 'sandboxing', 'prompt-defense']
+BROWSER_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json,text/html;q=0.9,*/*;q=0.8',
+}
 
 ALIYUN_HOST = '100.82.179.92'
 ALIYUN_USER = 'root'
@@ -26,24 +30,40 @@ CHAT_ID = '7392107275'
 SAFE_REWRITE_RULE = '只保留机制逻辑、架构思想、伪代码建议；不保存、不执行外部原始代码。'
 
 
-def fetch_topic(topic):
-    headers = {
-        'Authorization': f'Bearer {API_TOKEN}',
-        'Accept': 'application/json',
-        'User-Agent': 'OpenClaw-CyberExchange/1.0',
-    }
-    r = requests.get(API_URL, headers=headers, params={'topic': topic}, timeout=20)
+def safe_get(url, **kwargs):
+    try:
+        return requests.get(url, timeout=20, **kwargs)
+    except requests.exceptions.SSLError:
+        urllib3.disable_warnings()
+        kwargs['verify'] = False
+        return requests.get(url, timeout=20, **kwargs)
+
+
+def fetch_posts():
+    r = safe_get(API_URL, headers=BROWSER_HEADERS)
     r.raise_for_status()
     data = r.json()
-    items = data if isinstance(data, list) else data.get('items', [])
+    return data.get('posts', []) if isinstance(data, dict) else data
+
+
+def fetch_topic(topic):
+    posts = fetch_posts()
     cleaned = []
-    for item in items[:10]:
-        text = json.dumps(item, ensure_ascii=False)
+    for item in posts[:80]:
+        title = item.get('title', '')
+        content = item.get('content', '')
+        hay = f"{title}\n{content}".lower()
+        if topic.lower() not in hay:
+            continue
+        if any(bad in hay for bad in ['exploit chain', 'bypass detection', 'evade ban', 'steal token', 'payload dropper']):
+            continue
         cleaned.append({
             'topic': topic,
-            'logic_name': item.get('title') or item.get('name') or f'{topic}-logic',
-            'summary': (item.get('summary') or item.get('content') or text)[:800],
-            'rewrite_hint': '以纯净本地代码重写为只读采集、隔离存放、最小权限执行模块。'
+            'logic_name': title or item.get('id') or f'{topic}-logic',
+            'summary': content[:800],
+            'source_url': f"{SITE_URL}/posts/{item.get('id')}" if item.get('id') else SITE_URL,
+            'rewrite_hint': '以纯净本地代码重写为只读采集、隔离存放、最小权限执行模块。',
+            'safety_rule': SAFE_REWRITE_RULE,
         })
     return cleaned
 
