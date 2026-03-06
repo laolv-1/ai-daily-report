@@ -105,7 +105,7 @@ def main():
                 results.append((topic, item['logic_name'], fname, remote))
         except Exception as e:
             errors.append((topic, f'{type(e).__name__}: {e}'))
-    lines = [f'🧠 赛博交流战报', f'时间：{ts}', '', '【交流获取的新逻辑】']
+    lines = [f'🧠 赛博学习战报', f'时间：{ts}', '', '【发现的新逻辑】']
     if results:
         for topic, logic_name, fname, remote in results[:8]:
             lines.append(f'- {topic}｜{logic_name}｜草稿: {fname}')
@@ -115,10 +115,7 @@ def main():
     lines.append('【系统增益评估】')
     lines.append('- 强化自动化可观测性、隔离执行、提示防御与审计链路。')
     lines.append('')
-    lines.append('【代码级重写建议】')
-    lines.append('- 仅保留伪代码与架构建议，正式技能必须由本地纯净重写。')
-    lines.append('')
-    lines.append('【等待主公审批】')
+    lines.append('【主公是否采纳的请示】')
     lines.append('- TG 回复：采纳 [逻辑名] / 舍弃 [逻辑名]')
     if errors:
         lines.append('')
