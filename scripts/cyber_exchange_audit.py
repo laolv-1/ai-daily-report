@@ -21,34 +21,39 @@ REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 API_URL = 'https://moltbook.com/api/v1/posts'
 SITE_URL = 'https://moltbook.com'
-TOPICS = [
-    'agent-safety',
-    'sandboxing',
-    'prompt-defense',
-    'token-efficiency',
-    'prompt-compression',
-]
+OPENCLAW_CONFIG = Path('/root/.openclaw/openclaw.json')
+ALIYUN_HOST = '100.82.179.92'
+ALIYUN_USER = 'root'
+ALIYUN_PASSWORD = '8ce42842#'
+ALIYUN_DRAFT_DIR = '/www/wwwroot/spider_center/molt_learning/'
+CHAT_ID = '7392107275'
+SAFE_REWRITE_RULE = '只保留机制逻辑、架构思想、伪代码建议；不保存、不执行外部原始代码。'
+REQUEST_AUDIT_LOG = REPORT_DIR / 'request-audit.jsonl'
+APPROVAL_OUTBOX_DIR = ROOT / 'reports' / 'approval-outbox'
+APPROVAL_OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
 
-APPROVED_DOMAINS = {
-    'moltbook.com',
-    'api.telegram.org',
+BROAD_KEYWORDS = {
+    '自动化赚钱': ['automate revenue', 'make money', 'monetiz', 'pricing', 'subscription', 'profit', 'arbitrage', 'upsell', 'funnel'],
+    '流量截流': ['traffic', 'distribution', 'growth', 'acquisition', 'seo', 'feed', 'ranking', 'retention', 'viral'],
+    '风控绕过': ['moderation', 'risk', 'compliance', 'fraud', 'ban', 'blocked', 'bypass', 'evasion', 'detection'],
+    '大模型奇技淫巧': ['agent', 'llm', 'prompt', 'context', 'token', 'reasoning', 'tool call', 'jailbreak', 'compression'],
+    '新工具': ['tool', 'workflow', 'automation', 'browser', 'scrape', 'pipeline', 'plugin', 'sdk', 'open source'],
 }
-
+BLOCK_TERMS = ['payload dropper', 'steal token', 'credential stuffing', 'ransomware builder']
 HEADER_PROFILES = [
     {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'application/json,text/html;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         'Cache-Control': 'no-cache',
     },
     {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         'Accept': 'application/json,text/html;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.8',
         'Cache-Control': 'max-age=0',
     },
 ]
-
 SENSITIVE_PATTERNS = [
     '/root/.openclaw/workspace',
     'MEMORY.md',
@@ -59,26 +64,15 @@ SENSITIVE_PATTERNS = [
     'token',
 ]
 
-ALIYUN_HOST = '100.82.179.92'
-ALIYUN_USER = 'root'
-ALIYUN_PASSWORD = '8ce42842#'
-ALIYUN_DRAFT_DIR = '/www/wwwroot/spider_center/molt_learning/'
-
-BOT_TOKEN = '8545151429:AAGTiHUsUsH_VkYEtswD3I2v_7pDV9DO8S0'
-CHAT_ID = '7392107275'
-
-SAFE_REWRITE_RULE = '只保留机制逻辑、架构思想、伪代码建议；不保存、不执行外部原始代码。'
-AUDIOIT_LOG = REPORT_DIR / 'request-audit.jsonl'
-APPROVAL_OUTBOX_DIR = ROOT / 'reports' / 'approval-outbox'
-APPROVAL_OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
-
 SANDBOX = HttpSandbox(
-    approved_domains={
-        'moltbook.com',
-        'api.telegram.org',
-    },
+    approved_domains={'moltbook.com', 'api.telegram.org'},
     audit_log_path=str(REPORT_DIR / 'http-sandbox-audit.jsonl'),
 )
+
+
+def load_laicai_bot_token() -> str:
+    obj = json.loads(OPENCLAW_CONFIG.read_text(encoding='utf-8'))
+    return obj['channels']['telegram']['botToken']
 
 
 def choose_header_profile():
@@ -104,7 +98,7 @@ def audit_request(url: str, method: str, payload_text: str, profile: dict, verdi
         'ua': profile.get('User-Agent'),
         'verdict': verdict,
     }
-    with AUDIOIT_LOG.open('a', encoding='utf-8') as f:
+    with REQUEST_AUDIT_LOG.open('a', encoding='utf-8') as f:
         f.write(json.dumps(line, ensure_ascii=False) + '\n')
 
 
@@ -115,43 +109,73 @@ def guarded_request(url: str, method: str = 'GET', payload_text: str = '', **kwa
     if verdict == 'BLOCK':
         raise RuntimeError('敏感内容拦截：请求已阻断')
     guarded = SANDBOX.guard_request(method, url, payload_text=payload_text, ua=profile.get('User-Agent', ''))
-    time.sleep(random.uniform(0.6, 1.8))
+    time.sleep(random.uniform(0.4, 1.2))
     headers = dict(kwargs.pop('headers', {}) or {})
     headers.update(profile)
     try:
-        return requests.request(method, guarded['url'], headers=headers, timeout=20, **kwargs)
+        return requests.request(method, guarded['url'], headers=headers, timeout=25, **kwargs)
     except requests.exceptions.SSLError:
         urllib3.disable_warnings()
-        return requests.request(method, guarded['url'], headers=headers, timeout=20, verify=False, **kwargs)
+        return requests.request(method, guarded['url'], headers=headers, timeout=25, verify=False, **kwargs)
 
 
 def fetch_posts():
-    r = guarded_request(API_URL, method='GET', payload_text='topic_probe')
+    r = guarded_request(API_URL, method='GET', payload_text='moltbook_broad_probe')
     r.raise_for_status()
     data = r.json()
     return data.get('posts', []) if isinstance(data, dict) else data
 
 
-def fetch_topic(topic):
+def score_post(item: dict):
+    title = item.get('title', '') or ''
+    content = item.get('content', '') or ''
+    hay = f"{title}\n{content}".lower()
+    if any(term in hay for term in BLOCK_TERMS):
+        return None
+    score = 0
+    matched_labels = []
+    for label, keys in BROAD_KEYWORDS.items():
+        hit = False
+        for key in keys:
+            if key.lower() in hay:
+                score += 8 if key in title.lower() else 4
+                hit = True
+        if hit:
+            matched_labels.append(label)
+    if len(content) > 800:
+        score += 2
+    if 'http' in content.lower():
+        score += 1
+    if score < 8:
+        return None
+    return score, matched_labels
+
+
+def pick_posts(limit=6):
     posts = fetch_posts()
-    cleaned = []
-    for item in posts[:80]:
-        title = item.get('title', '')
-        content = item.get('content', '')
-        hay = f"{title}\n{content}".lower()
-        if topic.lower() not in hay:
+    picked = []
+    seen = set()
+    for item in posts[:120]:
+        result = score_post(item)
+        if not result:
             continue
-        if any(bad in hay for bad in ['exploit chain', 'bypass detection', 'evade ban', 'steal token', 'payload dropper']):
+        score, matched_labels = result
+        pid = item.get('id')
+        if pid in seen:
             continue
-        cleaned.append({
-            'topic': topic,
-            'logic_name': title or item.get('id') or f'{topic}-logic',
-            'summary': content[:800],
-            'source_url': f"{SITE_URL}/posts/{item.get('id')}" if item.get('id') else SITE_URL,
-            'rewrite_hint': '以纯净本地代码重写为只读采集、隔离存放、最小权限执行模块。',
+        seen.add(pid)
+        picked.append({
+            'id': pid,
+            'logic_name': item.get('title') or pid or 'untitled-post',
+            'summary': (item.get('content') or '')[:1200],
+            'source_url': f"{SITE_URL}/posts/{pid}" if pid else SITE_URL,
+            'labels': matched_labels,
+            'score': score,
+            'rewrite_hint': '提炼为可审计、最小权限、可落地的工作流或数据管道，不保留危险执行细节。',
             'safety_rule': SAFE_REWRITE_RULE,
         })
-    return cleaned
+    picked.sort(key=lambda x: (x['score'], len(x['summary'])), reverse=True)
+    return picked[:limit]
 
 
 def save_draft_to_aliyun(name, payload):
@@ -170,11 +194,12 @@ def save_draft_to_aliyun(name, payload):
 
 
 def send_report(text):
+    bot_token = load_laicai_bot_token()
     payload = {'chat_id': CHAT_ID, 'text': text[:3500], 'disable_web_page_preview': True}
     r = guarded_request(
-        f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage',
+        f'https://api.telegram.org/bot{bot_token}/sendMessage',
         method='POST',
-        payload_text='cyber_learning_overview',
+        payload_text=text[:500],
         data=payload,
     )
     r.raise_for_status()
@@ -182,61 +207,52 @@ def send_report(text):
 
 
 def build_overview_report(ts: str, results, errors):
-    lines = [f'🧠 赛博学习总览', f'时间：{ts}', '', '[废件与新闻总览]']
+    lines = [f'🧠 来财·MolTBook 广撒网总览', f'时间：{ts}', '']
     if results:
-        topic_counts = {}
-        for topic, logic_name, fname, remote in results:
-            topic_counts[topic] = topic_counts.get(topic, 0) + 1
-        lines.append(f'- 本轮抓到 {len(results)} 条机制草稿，主题分布：' + '，'.join(f'{k}={v}' for k, v in topic_counts.items()))
-        for topic, logic_name, fname, remote in results[:5]:
-            lines.append(f'- {topic}｜{logic_name[:80]}')
+        label_counts = {}
+        for item in results:
+            for label in item['labels']:
+                label_counts[label] = label_counts.get(label, 0) + 1
+        lines.append(f'- 本轮抓到 {len(results)} 条可审批逻辑；标签分布：' + '，'.join(f'{k}={v}' for k, v in sorted(label_counts.items())))
+        for item in results[:5]:
+            lines.append(f"- {item['logic_name'][:90]}｜标签：{'/'.join(item['labels'])}｜评分 {item['score']}")
     else:
-        lines.append('- 本轮未抓到新逻辑，已保留探测状态。')
-    lines.append('')
-    lines.append('[热度趋势]')
-    lines.append('- 近期主题仍集中在 sandboxing、prompt-defense、token-efficiency 三条线。')
+        lines.append('- 本轮广撒网未命中高价值候选，已保留审计日志，不主动打扰。')
     if errors:
         lines.append('')
         lines.append('[异常回执]')
-        for topic, err in errors[:5]:
-            lines.append(f'- {topic}｜{err}')
+        for err in errors[:5]:
+            lines.append(f'- {err}')
     return '\n'.join(lines)
 
 
-def build_approval_request(ts: str, results):
-    if not results:
-        return None
-    topic, logic_name, fname, remote = results[0]
-    lines = [f'【MolTBook 高价值逻辑审批单】', f'时间：{ts}', '']
-    lines.append(f'逻辑名称：{logic_name}')
-    lines.append(f'主题归类：{topic}')
+def build_approval_request(ts: str, item, fname, remote):
+    lines = ['【来财·MolTBook 广撒网审批单】', f'时间：{ts}', '']
+    lines.append(f"逻辑名称：{item['logic_name']}")
+    lines.append(f"命中标签：{' / '.join(item['labels'])}")
+    lines.append(f"信号评分：{item['score']}")
     lines.append('')
-    lines.append('【提纯判断】')
-    lines.append('这条不是八卦，是能直接焊进我们系统底座的机制：把 Agent 的外联请求视作未审计数据管道，默认不可信。')
+    lines.append('【主判断】')
+    lines.append('这条值得主公过目，不是因为它一定可用，而是它可能影响流量、变现、风控或 Agent 工作流。')
     lines.append('')
-    lines.append('【可注入系统的核心逻辑】')
-    lines.append('- 所有外联请求必须先过域名白名单。')
-    lines.append('- 所有请求必须记录时间、目标域、载荷哈希、UA、裁决结果。')
-    lines.append('- 命中敏感词或越权域名，直接阻断，不准出站。')
-    lines.append('- 长文本先压缩摘要再外发，减少上下文泄漏与 token 燃烧。')
+    lines.append('【提纯摘要】')
+    lines.append(item['summary'][:900] or '（原文摘要为空）')
     lines.append('')
-    lines.append('【伪代码】')
-    lines.append('1. request -> parse_domain()')
-    lines.append('2. if domain not in APPROVED_DOMAINS: block()')
-    lines.append('3. verdict = classify_payload(payload)')
-    lines.append('4. audit_log(time, domain, payload_hash, verdict, ua)')
-    lines.append('5. if verdict == BLOCK: raise')
-    lines.append('6. else: send(minified_payload)')
+    lines.append('【可注入系统的方向】')
+    lines.append('- 可做成流量截流/自动化赚钱/审核对抗/工具增强的观察样本。')
+    lines.append('- 仅保留工作流、机制、产品判断，不保留危险攻击细节。')
+    lines.append('- 若主公拍板，可再转成本地安全版 SOP 或草图。')
     lines.append('')
     lines.append('【隔离回执】')
-    lines.append(f'- 草稿已隔离落盘到阿里云：{remote}')
-    lines.append(f'- 本地索引文件：{fname}')
+    lines.append(f'- 阿里云草稿隔离：{remote}')
+    lines.append(f'- VPS 本地索引：{fname}')
+    lines.append(f"- 原帖链接：{item['source_url']}")
     lines.append('')
-    lines.append('[主公请审批：回复“采纳”或“舍弃”]')
+    lines.append('【主公请审批：回复“采纳”或“舍弃”】')
     return '\n'.join(lines)
 
 
-def write_approval_outbox(ts: str, text: str):
+def write_approval_outbox(text: str):
     out = APPROVAL_OUTBOX_DIR / f'approval-request-{dt.datetime.now().strftime("%Y%m%d-%H%M%S")}.md'
     out.write_text(text, encoding='utf-8')
     return out
@@ -244,30 +260,36 @@ def write_approval_outbox(ts: str, text: str):
 
 def main():
     ts = dt.datetime.now().strftime('%Y-%m-%d %H:%M')
-    results = []
     errors = []
-    for topic in TOPICS:
+    try:
+        picked = pick_posts(limit=6)
+    except Exception as e:
+        picked = []
+        errors.append(f'{type(e).__name__}: {e}')
+    results = []
+    for item in picked:
         try:
-            items = fetch_topic(topic)
-            for item in items[:2]:
-                fname, remote = save_draft_to_aliyun(topic, item)
-                results.append((topic, item['logic_name'], fname, remote))
+            fname, remote = save_draft_to_aliyun('broad-scan', item)
+            results.append({**item, 'fname': fname, 'remote': remote})
         except Exception as e:
-            errors.append((topic, f'{type(e).__name__}: {e}'))
+            errors.append(f"{item['logic_name'][:60]} -> {type(e).__name__}: {e}")
     overview_report = build_overview_report(ts, results, errors)
-    approval_request = build_approval_request(ts, results)
     out = REPORT_DIR / f'cyber-exchange-{dt.datetime.now().strftime("%Y%m%d-%H%M%S")}.md'
     out.write_text(overview_report, encoding='utf-8')
-    send_result = send_report(overview_report)
     print(out)
     print(overview_report)
-    if approval_request:
-        approval_out = write_approval_outbox(ts, approval_request)
+    if results:
+        approval_request = build_approval_request(ts, results[0], results[0]['fname'], results[0]['remote'])
+        approval_out = write_approval_outbox(approval_request)
+        send_result = send_report(approval_request)
         print('---APPROVAL_OUTBOX---')
         print(approval_out)
         print(approval_request)
-    print('---OVERVIEW_SEND_RESULT---')
-    print(json.dumps(send_result, ensure_ascii=False))
+        print('---OVERVIEW_SEND_RESULT---')
+        print(json.dumps(send_result, ensure_ascii=False))
+    else:
+        print('---NO_SIGNAL---')
+        print('本轮没有达到审批阈值的候选，不发送 Telegram。')
 
 
 if __name__ == '__main__':

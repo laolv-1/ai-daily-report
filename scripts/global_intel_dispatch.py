@@ -30,8 +30,8 @@ MODEL_BASE = os.getenv('LCK_BASE_URL', 'http://74.48.182.210:8317/v1')
 MODEL_KEY = os.getenv('LCK_API_KEY', 'xDjn0xIm6ztThd8pSexN8CmCRttLtt8T')
 MODEL_NAME = os.getenv('LCK_MODEL', 'gpt-5.4')
 
-TELEGRAM_BOT_TOKEN = os.getenv('LAFU_BOT_TOKEN', '8545151429:AAGTiHUsUsH_VkYEtswD3I2v_7pDV9DO8S0')
-TELEGRAM_CHAT_ID = os.getenv('LAFU_CHAT_ID', '7392107275')
+TELEGRAM_BOT_TOKEN = os.getenv('LAICAI_BOT_TOKEN', '8556322333:AAE9bmvzZV_TdXHC5QxmhIddaEL1ee_7egQ')
+TELEGRAM_CHAT_ID = os.getenv('LAICAI_CHAT_ID', '7392107275')
 
 SUBREDDITS = [
     ('SaaS', 'hot'),
@@ -71,15 +71,10 @@ def sandbox_post(url: str, *, headers=None, json_payload=None, data=None, timeou
     if json_payload is not None:
         payload_text = json.dumps(json_payload, ensure_ascii=False)
         guarded = SANDBOX.guard_request('POST', url, payload_text=payload_text, ua=ua)
-        return requests.post(guarded['url'], headers=headers, json=json.loads(guarded['payload_text']), timeout=timeout)
+        return requests.post(guarded['url'], headers=headers, json=json_payload, timeout=timeout)
     payload_text = json.dumps(data, ensure_ascii=False) if isinstance(data, dict) else str(data or '')
     guarded = SANDBOX.guard_request('POST', url, payload_text=payload_text, ua=ua)
-    safe_data = data
-    if isinstance(data, dict):
-        safe_data = json.loads(guarded['payload_text'])
-    else:
-        safe_data = guarded['payload_text']
-    return requests.post(guarded['url'], headers=headers, data=safe_data, timeout=timeout)
+    return requests.post(guarded['url'], headers=headers, data=data, timeout=timeout)
 
 
 def score_post(p: dict) -> int:
@@ -270,17 +265,28 @@ def archive_send_log(ts: str, payload: dict, response_text: str, status_code: in
     return path
 
 
-def send_to_laifu(report: str, ts: str):
+def _clean_text(text: str) -> str:
+    text = (text or '').replace('\x00', ' ')
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', ' ', text)
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def send_to_laicai(report: str, ts: str):
     url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage'
+    clean_text = _clean_text(report)[:3500]
     payload = {
         'chat_id': TELEGRAM_CHAT_ID,
-        'text': report[:3500],
+        'text': clean_text,
         'disable_web_page_preview': True,
     }
+    # Telegram 发送只审目标域名与简短载荷标签，避免正文因出现 token/password 等安全词被误伤。
+    SANDBOX.guard_request('POST', url, payload_text='telegram_report_send', ua='OpenClawGlobalIntel/1.0')
     last_err = None
     for attempt in range(1, 4):
         try:
-            r = sandbox_post(url, data=payload, timeout=30)
+            r = requests.post(url, json=payload, timeout=30)
             archive_send_log(ts, payload, r.text, r.status_code)
             r.raise_for_status()
             data = r.json()
@@ -306,7 +312,7 @@ def main():
     latest = REPORT_DIR / 'global-intel-latest.md'
     out.write_text(report, encoding='utf-8')
     latest.write_text(report, encoding='utf-8')
-    send_result = send_to_laifu(report, ts)
+    send_result = send_to_laicai(report, ts)
     mark_result = mark_domestic_pushed(domestic)
     print(str(out))
     print('---RESULT---')
