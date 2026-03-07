@@ -3,6 +3,7 @@ import datetime as dt
 import hashlib
 import json
 import random
+import sys
 import time
 from pathlib import Path
 from urllib.parse import urlparse
@@ -10,6 +11,9 @@ from urllib.parse import urlparse
 import paramiko
 import requests
 import urllib3
+
+sys.path.insert(0, '/root/openclaw/skills')
+from http_sandbox import HttpSandbox
 
 ROOT = Path('/root/.openclaw/workspace')
 REPORT_DIR = ROOT / 'reports' / 'cyber-exchange'
@@ -68,6 +72,14 @@ AUDIOIT_LOG = REPORT_DIR / 'request-audit.jsonl'
 APPROVAL_OUTBOX_DIR = ROOT / 'reports' / 'approval-outbox'
 APPROVAL_OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
 
+SANDBOX = HttpSandbox(
+    approved_domains={
+        'moltbook.com',
+        'api.telegram.org',
+    },
+    audit_log_path=str(REPORT_DIR / 'http-sandbox-audit.jsonl'),
+)
+
 
 def choose_header_profile():
     return dict(random.choice(HEADER_PROFILES))
@@ -97,22 +109,20 @@ def audit_request(url: str, method: str, payload_text: str, profile: dict, verdi
 
 
 def guarded_request(url: str, method: str = 'GET', payload_text: str = '', **kwargs):
-    domain = urlparse(url).netloc
-    if domain not in APPROVED_DOMAINS:
-        raise RuntimeError(f'未授权目标域名: {domain}')
     profile = choose_header_profile()
     verdict = classify_payload(payload_text)
     audit_request(url, method, payload_text, profile, verdict)
     if verdict == 'BLOCK':
         raise RuntimeError('敏感内容拦截：请求已阻断')
+    guarded = SANDBOX.guard_request(method, url, payload_text=payload_text, ua=profile.get('User-Agent', ''))
     time.sleep(random.uniform(0.6, 1.8))
     headers = dict(kwargs.pop('headers', {}) or {})
     headers.update(profile)
     try:
-        return requests.request(method, url, headers=headers, timeout=20, **kwargs)
+        return requests.request(method, guarded['url'], headers=headers, timeout=20, **kwargs)
     except requests.exceptions.SSLError:
         urllib3.disable_warnings()
-        return requests.request(method, url, headers=headers, timeout=20, verify=False, **kwargs)
+        return requests.request(method, guarded['url'], headers=headers, timeout=20, verify=False, **kwargs)
 
 
 def fetch_posts():

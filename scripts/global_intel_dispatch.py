@@ -12,6 +12,9 @@ from pathlib import Path
 import paramiko
 import requests
 
+sys.path.insert(0, '/root/openclaw/skills')
+from http_sandbox import HttpSandbox
+
 ROOT = Path('/root/.openclaw/workspace')
 REPORT_DIR = ROOT / 'reports'
 SEND_LOG_DIR = ROOT / 'reports' / 'send-logs'
@@ -45,6 +48,38 @@ KEYWORDS_BAD = [
     'meme', 'shitpost', 'roast', 'hiring', 'career', 'weekly thread', 'off topic', 'funny',
     'monthly post', 'mentorship monday', 'deals + offers', 'iptv'
 ]
+
+SANDBOX = HttpSandbox(
+    approved_domains={
+        'www.reddit.com',
+        'reddit.com',
+        '74.48.182.210:8317',
+        'api.telegram.org',
+    },
+    audit_log_path='/root/.openclaw/workspace/reports/global-intel-http-audit.jsonl',
+)
+
+
+def sandbox_get(url: str, *, headers=None, timeout=20, verify=True):
+    ua = (headers or {}).get('User-Agent', '')
+    guarded = SANDBOX.guard_request('GET', url, payload_text='', ua=ua)
+    return requests.get(guarded['url'], headers=headers, timeout=timeout, verify=verify)
+
+
+def sandbox_post(url: str, *, headers=None, json_payload=None, data=None, timeout=30):
+    ua = (headers or {}).get('User-Agent', '')
+    if json_payload is not None:
+        payload_text = json.dumps(json_payload, ensure_ascii=False)
+        guarded = SANDBOX.guard_request('POST', url, payload_text=payload_text, ua=ua)
+        return requests.post(guarded['url'], headers=headers, json=json.loads(guarded['payload_text']), timeout=timeout)
+    payload_text = json.dumps(data, ensure_ascii=False) if isinstance(data, dict) else str(data or '')
+    guarded = SANDBOX.guard_request('POST', url, payload_text=payload_text, ua=ua)
+    safe_data = data
+    if isinstance(data, dict):
+        safe_data = json.loads(guarded['payload_text'])
+    else:
+        safe_data = guarded['payload_text']
+    return requests.post(guarded['url'], headers=headers, data=safe_data, timeout=timeout)
 
 
 def score_post(p: dict) -> int:
@@ -81,7 +116,7 @@ def fetch_reddit(limit_per_sub: int = 10):
         last_err = None
         for url in urls:
             try:
-                r = requests.get(url, headers=headers, timeout=20)
+                r = sandbox_get(url, headers=headers, timeout=20)
                 r.raise_for_status()
                 data = r.json()['data']['children']
                 break
@@ -185,7 +220,7 @@ def summarize_with_model(domestic, reddit):
         'temperature': 0.4
     }
     url = MODEL_BASE.rstrip('/') + '/chat/completions'
-    r = requests.post(url, headers={'Authorization': f'Bearer {MODEL_KEY}'}, json=prompt, timeout=90)
+    r = sandbox_post(url, headers={'Authorization': f'Bearer {MODEL_KEY}'}, json_payload=prompt, timeout=90)
     r.raise_for_status()
     data = r.json()
     return data['choices'][0]['message']['content'].strip()
@@ -245,7 +280,7 @@ def send_to_laifu(report: str, ts: str):
     last_err = None
     for attempt in range(1, 4):
         try:
-            r = requests.post(url, data=payload, timeout=30)
+            r = sandbox_post(url, data=payload, timeout=30)
             archive_send_log(ts, payload, r.text, r.status_code)
             r.raise_for_status()
             data = r.json()
