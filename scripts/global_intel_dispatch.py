@@ -205,14 +205,23 @@ def summarize_with_model(domestic, reddit):
         'messages': [
             {
                 'role': 'system',
-                'content': '你是情报总控官。请把国内风控/平台动态与海外 Reddit 风险讨论融合成一份精炼但有判断力的日报。输出必须是中文，避免空话，给出明确风险、映射和行动建议。'
+                'content': (
+                    '你是情报总控官。你必须输出一份极简中文 Markdown 战报，且必须严格遵守以下格式，不得多写废话：\n'
+                    '1. 只能输出两个一级区块：## 🇨🇳 国内资金与流量 以及 ## 🇺🇸 海外硬核与漏洞。\n'
+                    '2. 每个区块下只能使用 Markdown 表格。\n'
+                    '3. 表头必须固定为：| 风险级别 | 核心事件 | 主公对策 |\n'
+                    '4. 每个区块最多 4 行，单元格极简短句，禁止长段解释。\n'
+                    '5. 不要输出“一句话判断”、前言、总结、分隔线、项目符号、编号、注释、代码块。\n'
+                    '6. 风险级别只允许：高 / 中 / 低。\n'
+                    '7. 主公对策必须是可执行动作，短句收尾。'
+                )
             },
             {
                 'role': 'user',
                 'content': json.dumps({'domestic': domestic, 'reddit': reddit}, ensure_ascii=False)
             }
         ],
-        'temperature': 0.4
+        'temperature': 0.2
     }
     url = MODEL_BASE.rstrip('/') + '/chat/completions'
     r = sandbox_post(url, headers={'Authorization': f'Bearer {MODEL_KEY}'}, json_payload=prompt, timeout=90)
@@ -222,36 +231,47 @@ def summarize_with_model(domestic, reddit):
 
 
 def fallback_summary(domestic, reddit):
-    lines = ['【总览】', '今天国内侧偏平台风控/技术话题，海外侧偏支付、合规、安全风险。建议把支付、封号、攻击面三条线合并观察。']
+    def cut(text, n=26):
+        text = re.sub(r'\s+', ' ', str(text or '')).strip()
+        return text if len(text) <= n else text[:n - 1] + '…'
+
+    lines = []
+    lines.append('## 🇨🇳 国内资金与流量')
+    lines.append('| 风险级别 | 核心事件 | 主公对策 |')
+    lines.append('|---|---|---|')
+    if domestic:
+        for item in domestic[:4]:
+            level = '高' if int(item.get('anxiety_score', 0)) >= 18 else ('中' if int(item.get('anxiety_score', 0)) >= 10 else '低')
+            event = cut(f"{item.get('category','未分类')}：{item.get('title','')}")
+            action = '盯关键词、复核影响、准备跟单'
+            lines.append(f'| {level} | {event} | {action} |')
+    else:
+        lines.append('| 低 | 国内侧暂无新高压信号 | 保持巡航，不加动作 |')
     lines.append('')
-    lines.append('【国内映射】')
-    for item in domestic[:5]:
-        lines.append(f"- {item['category']}｜{item['title']}（{item['source']}，焦虑分 {item['anxiety_score']}）")
-    lines.append('')
-    lines.append('【海外 Reddit Digest】')
-    for item in reddit[:5]:
-        lines.append(f"- r/{item['subreddit']}｜{item['title']}（热度 {item['score']} / 评论 {item['comments']}）")
-    lines.append('')
-    lines.append('【动作建议】')
-    lines.append('- 盯支付合规、账户风控、漏洞披露三条线。')
-    lines.append('- 国内舆情若出现平台政策收紧，优先映射到 Stripe/KYC/封号链路。')
+    lines.append('## 🇺🇸 海外硬核与漏洞')
+    lines.append('| 风险级别 | 核心事件 | 主公对策 |')
+    lines.append('|---|---|---|')
+    if reddit:
+        for item in reddit[:4]:
+            s = int(item.get('signal_score', 0))
+            level = '高' if s >= 90 else ('中' if s >= 60 else '低')
+            event = cut(f"r/{item.get('subreddit','?')}：{item.get('title','')}")
+            action = '追原帖、看评论、提炼漏洞点'
+            lines.append(f'| {level} | {event} | {action} |')
+    else:
+        lines.append('| 低 | 海外侧暂无高价值热帖 | 继续抓取，不做推演 |')
     return '\n'.join(lines)
 
 
 def render_report(domestic, reddit, summary):
     now = dt.datetime.now().strftime('%Y-%m-%d %H:%M %Z')
+    summary = (summary or '').strip()
+    summary = re.sub(r'^```(?:markdown)?\s*', '', summary, flags=re.I)
+    summary = re.sub(r'\s*```$', '', summary)
+    summary = _enforce_brief_tables(summary, domestic, reddit)
     lines = [f'🔥 来福双擎情报日报', f'生成时间：{now}', '']
-    lines.append('## 深度总结')
     lines.append(summary)
-    lines.append('')
-    lines.append('## 国内情报矿场（阿里云）')
-    for item in domestic:
-        lines.append(f"- [{item['category']}] {item['title']}｜{item['source']}｜焦虑分 {item['anxiety_score']}｜{item['created']}\n  {item['url']}")
-    lines.append('')
-    lines.append('## 海外 Reddit Digest（VPS）')
-    for item in reddit:
-        lines.append(f"- [r/{item['subreddit']}] {item['title']}｜热度 {item['score']}｜评论 {item['comments']}｜信号分 {item['signal_score']}｜{item['created']}\n  {item['url']}")
-    return '\n'.join(lines)
+    return '\n'.join(lines).strip()
 
 
 def archive_send_log(ts: str, payload: dict, response_text: str, status_code: int):
@@ -263,6 +283,16 @@ def archive_send_log(ts: str, payload: dict, response_text: str, status_code: in
         'response_text': response_text,
     }, ensure_ascii=False, indent=2), encoding='utf-8')
     return path
+
+
+def _enforce_brief_tables(text: str, domestic, reddit) -> str:
+    text = (text or '').strip()
+    has_cn = '## 🇨🇳 国内资金与流量' in text
+    has_us = '## 🇺🇸 海外硬核与漏洞' in text
+    has_header = '| 风险级别 | 核心事件 | 主公对策 |' in text
+    if has_cn and has_us and has_header:
+        return text
+    return fallback_summary(domestic, reddit)
 
 
 def _clean_text(text: str) -> str:
