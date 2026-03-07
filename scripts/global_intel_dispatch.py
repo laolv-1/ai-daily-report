@@ -30,8 +30,8 @@ MODEL_BASE = os.getenv('LCK_BASE_URL', 'http://74.48.182.210:8317/v1')
 MODEL_KEY = os.getenv('LCK_API_KEY', 'xDjn0xIm6ztThd8pSexN8CmCRttLtt8T')
 MODEL_NAME = os.getenv('LCK_MODEL', 'gpt-5.4')
 
-TELEGRAM_BOT_TOKEN = os.getenv('LAICAI_BOT_TOKEN', '8556322333:AAE9bmvzZV_TdXHC5QxmhIddaEL1ee_7egQ')
-TELEGRAM_CHAT_ID = os.getenv('LAICAI_CHAT_ID', '7392107275')
+TELEGRAM_BOT_TOKEN = os.getenv('LAFU_BOT_TOKEN', '8545151429:AAGTiHUsUsH_VkYEtswD3I2v_7pDV9DO8S0')
+TELEGRAM_CHAT_ID = os.getenv('LAFU_CHAT_ID', '7392107275')
 
 SUBREDDITS = [
     ('SaaS', 'hot'),
@@ -273,7 +273,7 @@ def _clean_text(text: str) -> str:
     return text.strip()
 
 
-def send_to_laicai(report: str, ts: str):
+def send_to_laifu(report: str, ts: str):
     url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage'
     clean_text = _clean_text(report)[:3500]
     payload = {
@@ -312,7 +312,7 @@ def main():
     latest = REPORT_DIR / 'global-intel-latest.md'
     out.write_text(report, encoding='utf-8')
     latest.write_text(report, encoding='utf-8')
-    send_result = send_to_laicai(report, ts)
+    send_result = send_to_laifu(report, ts)
     mark_result = mark_domestic_pushed(domestic)
     print(str(out))
     print('---RESULT---')
