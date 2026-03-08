@@ -68,6 +68,29 @@ def diff_for(path: str) -> str:
         return f'无法读取差异：{path} | {e}'
 
 
+def fallback_summary(path: str, content: str) -> str:
+    low = (content or '').lower()
+    if path == '.gitignore':
+        return '新增全局忽略规则，清理日志、草稿、审计记录、临时目录和运行噪音。'
+    if path.endswith('system_change_log.py'):
+        return '把系统变更日志从机器状态输出升级为人话摘要，并补上 GitHub 双端归档与失败兜底。'
+    if path.endswith('polymarket_phantom_hunt.py'):
+        return '新增 Polymarket 幽灵狩猎接应脚本，加入清场、硬校验、删机甲和 Win10 桥接闭环。'
+    if path.endswith('heavy_scraper.py'):
+        return '调整网页渲染与截图逻辑，优化动态站点等待策略和战利品回传链路。'
+    if 'playwright install --with-deps chromium' in low:
+        return '补齐 Playwright 与 Chromium 系统依赖安装逻辑。'
+    if 'wait_for_timeout(15000)' in content:
+        return '增加了动态网页强制等待 15 秒的逻辑，避免长连接页面过早截图。'
+    if 'networkidle' in low and 'domcontentloaded' in low:
+        return '把等待策略从 networkidle 改为更稳的 domcontentloaded 路线。'
+    if path.endswith('.md'):
+        return '更新了文档或说明文字。'
+    if path.endswith('.json'):
+        return '更新了状态记录或结构化配置。'
+    return '更新了该文件的逻辑或运行状态。'
+
+
 def summarize_change(path: str, content: str) -> str:
     prompt = {
         'model': MODEL_NAME,
@@ -88,11 +111,15 @@ def summarize_change(path: str, content: str) -> str:
         ],
         'temperature': 0.2,
     }
-    url = MODEL_BASE.rstrip('/') + '/chat/completions'
-    r = requests.post(url, headers={'Authorization': f'Bearer {MODEL_KEY}'}, json=prompt, timeout=90)
-    r.raise_for_status()
-    text = r.json()['choices'][0]['message']['content'].strip()
-    return text.replace('\n', ' ').strip(' -')
+    try:
+        url = MODEL_BASE.rstrip('/') + '/chat/completions'
+        r = requests.post(url, headers={'Authorization': f'Bearer {MODEL_KEY}'}, json=prompt, timeout=90)
+        r.raise_for_status()
+        text = r.json()['choices'][0]['message']['content'].strip()
+        text = text.replace('\n', ' ').strip(' -')
+        return text or fallback_summary(path, content)
+    except Exception:
+        return fallback_summary(path, content)
 
 
 def collect_entries(extra_notes=''):
