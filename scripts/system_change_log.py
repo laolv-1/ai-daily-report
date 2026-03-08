@@ -20,13 +20,18 @@ REMOTE_BASE = 'D:/来财/系统更新日志'
 MODEL_BASE = 'http://74.48.182.210:8317/v1'
 MODEL_KEY = 'xDjn0xIm6ztThd8pSexN8CmCRttLtt8T'
 MODEL_NAME = 'lck/gpt-5.4'
-MAX_FILES = 10
+MAX_FILES = 8
 MAX_DIFF_CHARS = 6000
 BLACKLIST_PHRASES = [
     '更新了逻辑', '修改了逻辑', '优化了代码', '修改了配置', '更改了状态',
     '更新了文档', '更新了说明文字', '调整了逻辑', '做了优化', '做了调整',
-    '更新了该文件的逻辑或运行状态', '更新了状态记录或结构化配置'
+    '更新了该文件的逻辑或运行状态', '更新了状态记录或结构化配置',
+    '本次变更涉及', '关键标记', '运行状态变化'
 ]
+CORE_ROOT_FILES = {'.gitignore', '.env', 'package.json', 'pnpm-lock.yaml'}
+CORE_SUFFIXES = ('.py', '.sh', '.json', '.md')
+NOISE_PREFIXES = ('memory/', 'reports/', 'github_sync/', '.openclaw/', 'tmp_', 'memory-lancedb-pro/', 'plugins/')
+NOISE_SUFFIXES = ('.log', '.jsonl', '.out', '.draft')
 
 
 def run(cmd, check=True):
@@ -36,21 +41,22 @@ def run(cmd, check=True):
     return (p.stdout or '').strip()
 
 
-def _score_path(path: str) -> tuple:
-    score = 100
-    if path.startswith('scripts/'):
-        score -= 50
-    if path.endswith(('.py', '.sh', '.md', '.json')):
-        score -= 20
-    if path == '.gitignore':
-        score -= 30
-    if path.startswith('memory/'):
-        score += 30
-    if path.startswith('reports/'):
-        score += 20
-    if path.endswith(('.log', '.jsonl')):
-        score += 40
-    return (score, path)
+def is_allowed_path(path: str) -> bool:
+    if not path or path.endswith('/'):
+        return False
+    if any(path.startswith(prefix) for prefix in NOISE_PREFIXES):
+        return False
+    if path.endswith(NOISE_SUFFIXES):
+        return False
+    if path in CORE_ROOT_FILES:
+        return True
+    if path.startswith('scripts/') and path.endswith(CORE_SUFFIXES):
+        return True
+    if path.startswith('plugins/') and path.endswith(CORE_SUFFIXES) and '/skill/' not in path:
+        return True
+    if '/' not in path and path.endswith(('.json', '.env')):
+        return True
+    return False
 
 
 def tracked_changes():
@@ -63,9 +69,9 @@ def tracked_changes():
         out = run(cmd, check=False)
         for line in out.splitlines():
             line = line.strip()
-            if line and line not in names:
+            if line and line not in names and is_allowed_path(line):
                 names.append(line)
-    names.sort(key=_score_path)
+    names.sort(key=lambda p: (0 if p.startswith('scripts/') else 1, p))
     return names[:MAX_FILES]
 
 
@@ -83,12 +89,6 @@ def is_untracked(path: str) -> bool:
 
 def diff_for(path: str) -> str:
     try:
-        if path.startswith('/root/'):
-            p = Path(path)
-            if not p.exists():
-                return f'文件不存在：{path}'
-            text = p.read_text(encoding='utf-8', errors='ignore')
-            return f'FILE_CONTENT\n{text[:MAX_DIFF_CHARS]}'
         if is_untracked(path):
             p = ROOT / path
             if p.exists():
@@ -105,6 +105,27 @@ def diff_for(path: str) -> str:
         return f'文件不存在：{path}'
     except Exception as e:
         return f'无法读取差异：{path} | {e}'
+
+
+def extract_value_changes(diff_text: str):
+    removed = []
+    added = []
+    for raw in diff_text.splitlines():
+        if raw.startswith(('---', '+++', '@@', 'diff --git', 'index ')):
+            continue
+        if raw.startswith('-'):
+            removed.append(raw[1:].strip())
+        elif raw.startswith('+'):
+            added.append(raw[1:].strip())
+    pairs = []
+    for old in removed[:20]:
+        for new in added[:20]:
+            m1 = re.match(r'([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)', old)
+            m2 = re.match(r'([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)', new)
+            if m1 and m2 and m1.group(1) == m2.group(1) and m1.group(2) != m2.group(2):
+                pairs.append((m1.group(1), m1.group(2), m2.group(2)))
+                break
+    return pairs[:3]
 
 
 def meaningful_lines(diff_text: str, limit: int = 4):
@@ -124,44 +145,18 @@ def meaningful_lines(diff_text: str, limit: int = 4):
     return out
 
 
-def extract_tokens(diff_text: str, limit: int = 6):
-    tokens = []
-    seen = set()
-    patterns = [
-        r'[A-Za-z_][A-Za-z0-9_]{2,}',
-        r'\b\d+(?:\.\d+)?\b',
-        r"'[^'\n]{2,80}'",
-        r'"[^"\n]{2,80}"',
-    ]
-    for pat in patterns:
-        for m in re.findall(pat, diff_text):
-            tok = str(m).strip()
-            if tok in seen:
-                continue
-            if tok.lower() in {'true', 'false', 'none', 'json', 'utf', 'ignore'}:
-                continue
-            seen.add(tok)
-            tokens.append(tok)
-            if len(tokens) >= limit:
-                return tokens
-    return tokens
-
-
 def fallback_summary(path: str, content: str) -> str:
-    lines = meaningful_lines(content, limit=4)
-    tokens = extract_tokens(content, limit=6)
+    pairs = extract_value_changes(content)
+    if pairs:
+        key, old, new = pairs[0]
+        return f'将 {key} 从 {old} 改为 {new}。'
+    lines = meaningful_lines(content, limit=3)
     if lines:
-        quoted = '；'.join(lines[:2])
-        if len(quoted) > 160:
-            quoted = quoted[:157] + '...'
-        return f'关键改动直接体现在代码差异：{quoted}'
-    if tokens:
-        return f'本次变更涉及关键标记：{", ".join(tokens[:6])}'
-    p = ROOT / path
-    if p.exists():
-        head = p.read_text(encoding='utf-8', errors='ignore')[:160].replace('\n', ' ')
-        return f'该文件当前开头内容为：{head}'
-    return '该文件有变更，但当前未能提取出可读差异片段。'
+        core = lines[0]
+        if len(core) > 140:
+            core = core[:137] + '...'
+        return f'新增或修改核心代码行：{core}'
+    return '该文件有变更，但当前只抓到很少的有效差异。'
 
 
 def sanitize_summary(text: str, path: str, content: str) -> str:
@@ -171,7 +166,7 @@ def sanitize_summary(text: str, path: str, content: str) -> str:
     for bad in BLACKLIST_PHRASES:
         if bad in text:
             return fallback_summary(path, content)
-    if len(text) < 10:
+    if len(text) < 8:
         return fallback_summary(path, content)
     return text
 
@@ -183,13 +178,13 @@ def summarize_change(path: str, content: str) -> str:
             {
                 'role': 'system',
                 'content': (
-                    '你是系统变更审计官。你必须把 git diff 翻译成一句可复盘的中文战术简报。'
-                    '你只能根据我给你的真实差异内容作答，必须点出具体函数名、变量名、参数值、阈值、超时时间、文件路径、提交文案或核心文案变化。'
-                    '严禁使用以下废话：更新了逻辑、修改了配置、优化了代码、更改了状态、更新了文档、做了调整、运行状态变化。'
-                    '如果 diff 里出现数值变化，必须写出“从多少改到多少”。'
-                    '如果 diff 里出现函数名、变量名、字段名、文件路径，必须至少点名 1-2 个。'
-                    '输出只允许一句中文，不要前言，不要解释过程，不要模糊词，不要套话。'
-                    '示例：将 MAX_FILES 从 12 改为 10，并新增 BLACKLIST_PHRASES 黑名单来拦截“更新了逻辑”这类废话。'
+                    '你是一个冷酷的战术分析师。你只能根据真实 git diff 输出一句中文结论。'
+                    '只允许写具体变量名、函数名、参数数值、超时时间、文件路径或新增代码行。'
+                    '严禁输出：更新了逻辑、修改了配置、优化了代码、更改了状态、本次变更涉及、关键标记。'
+                    '如果不确定，就直接提取 diff 中最关键的新增代码行或数值变化，绝不允许发明宽泛总结词。'
+                    'Few-shot 示例1：scripts/market_research_daily.py -> 将 requests.get 的 timeout 参数从 20 改为 25。'
+                    'Few-shot 示例2：scripts/soul_backup.py -> 将 banner_timeout、auth_timeout 和 timeout 的等待时间从 10 延长至 12。'
+                    'Few-shot 示例3：scripts/system_change_log.py -> 新增 BLACKLIST_PHRASES，并在 sanitize_summary 中拦截“本次变更涉及”这类废话。'
                 )
             },
             {
@@ -197,7 +192,7 @@ def summarize_change(path: str, content: str) -> str:
                 'content': json.dumps({'file': path, 'git_diff': content[:4200]}, ensure_ascii=False)
             }
         ],
-        'temperature': 0.1,
+        'temperature': 0.0,
     }
     try:
         url = MODEL_BASE.rstrip('/') + '/chat/completions'
@@ -238,7 +233,7 @@ def build_log(extra_notes=''):
         f'# 系统变更日志｜{date_str}',
         '',
         '## 今日变更摘要',
-        '以下内容已基于真实 git diff 生成，目标是让主公能直接复盘具体动作：',
+        '以下内容只聚焦核心脚本与配置变更，已物理屏蔽 memory/、reports/、.log、.jsonl 等运行噪音：',
         '',
     ]
     if not entries:
