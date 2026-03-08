@@ -84,7 +84,7 @@ def fetch_reddit(limit_per_sub: int = 8):
     for sub, mode in SUBREDDITS:
         url = f'https://www.reddit.com/r/{sub}/{mode}.json?limit={limit_per_sub}&raw_json=1'
         try:
-            r = requests.get(url, headers=headers, timeout=25)
+            r = requests.get(url, headers=headers, timeout=28)
             r.raise_for_status()
             data = r.json()['data']['children']
         except Exception as e:
