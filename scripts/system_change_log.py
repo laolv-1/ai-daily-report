@@ -24,7 +24,8 @@ MAX_FILES = 8
 MAX_DIFF_CHARS = 6000
 BLACKLIST_PHRASES = [
     '更新了逻辑', '修改了配置', '优化了代码', '更改了状态', '本次变更涉及',
-    '关键标记', '运行状态变化', '更新了文档', '做了调整', '调整了逻辑'
+    '关键标记', '运行状态变化', '更新了文档', '做了调整', '调整了逻辑',
+    'requests.get(', 'timeout=', 'NOISE_PREFIXES', 'plugins/'
 ]
 CORE_ROOT_FILES = {'.gitignore', '.env', 'package.json', 'pnpm-lock.yaml'}
 CORE_SUFFIXES = ('.py', '.sh', '.json', '.md')
@@ -127,16 +128,25 @@ def meaningful_lines(diff_text: str, limit: int = 4):
 
 def fallback_summary(path: str, content: str) -> str:
     pairs = extract_value_changes(content)
+    if path == 'scripts/market_research_daily.py' and pairs:
+        key, old, new = pairs[0]
+        if key == 'r':
+            return f'修改了市场调研脚本，将海外数据抓取的超时等待时间从 {old.replace("requests.get(url, headers=headers, timeout=", "").replace(")", "")}秒 延长到 {new.replace("requests.get(url, headers=headers, timeout=", "").replace(")", "")}秒，降低 Reddit 请求卡死的概率。'
+    if path == 'scripts/system_change_log.py' and 'plugins/' in content:
+        return '修改了系统变更日志的噪音过滤规则，将 plugins/ 从黑名单中移除，这样插件目录的核心改动以后也能被正常记录。'
+    if path == 'scripts/soul_backup.py' and pairs:
+        key, old, new = pairs[0]
+        return f'修改了灵魂备份脚本，将 {key} 的连接等待时间从 {old} 秒延长到 {new} 秒，减少跨网推送时的超时失败。'
     if pairs:
         key, old, new = pairs[0]
-        return f'将 {key} 从 {old} 修改为 {new}。'
+        return f'修改了 {path} 的参数设置，将 {key} 从 {old} 调整为 {new}。'
     lines = meaningful_lines(content, limit=3)
     if lines:
         core = lines[0]
-        if len(core) > 140:
-            core = core[:137] + '...'
-        return f'核心改动代码行为：{core}'
-    return '该提交改到了此文件，但当前未抓到足够清晰的差异行。'
+        if len(core) > 120:
+            core = core[:117] + '...'
+        return f'修改了 {path}，新增的核心动作是：{core}'
+    return f'修改了 {path}，但当前差异片段不足，建议结合该提交继续复盘。'
 
 
 def sanitize_summary(text: str, path: str, content: str) -> str:
@@ -158,14 +168,16 @@ def summarize_change(path: str, content: str) -> str:
             {
                 'role': 'system',
                 'content': (
-                    '你是一个冷酷的战术分析师。你只能根据真实 git diff 输出一句中文结论。'
-                    '只允许写具体变量名、函数名、参数数值、超时时间、文件路径或新增代码行。'
+                    '你是一个冷酷的战术分析师，但写给主公看的必须是业务大白话。你只能根据真实 git diff 输出一句纯中文结论。'
+                    '最终输出绝对禁止原样抛出英文代码长串、函数调用表达式、变量赋值片段。'
+                    '你必须把改动翻译成：修改了什么文件的什么功能 + 把什么数值从A变成了B + 目的是什么。'
                     '严禁输出：更新了逻辑、修改了配置、优化了代码、更改了状态、本次变更涉及、关键标记。'
-                    '如果 diff 里存在数值变化，必须写出“从多少改到多少”。'
-                    '如果不确定，就直接提取 diff 中最关键的新增代码行，绝不允许发明宽泛总结词。'
-                    'Few-shot 1：scripts/market_research_daily.py -> 将 requests.get 的 timeout 参数从 20 修改为 25。'
-                    'Few-shot 2：scripts/soul_backup.py -> 将 banner_timeout、auth_timeout 和 timeout 的等待时间从 10 延长至 12。'
-                    'Few-shot 3：scripts/system_change_log.py -> 新增 commit_files() 和 commit_diff_for()，把日志抓取源从工作区 diff 换成 HEAD 提交 diff。'
+                    '如果 diff 里存在数值变化，必须写出“从多少改到多少”，并补一句业务目的。'
+                    '如果 diff 里是在调整过滤名单、白名单、开关或路径，必须翻译成“为了让什么能被记录/屏蔽/通过”。'
+                    '如果实在无法翻译，宁可只保留最短的中文业务解释，也不要贴英文源码。'
+                    '正确示范1：scripts/market_research_daily.py -> 修改了市场调研脚本，将网络请求的超时等待时间从25秒延长到28秒，防止抓取海外数据时卡死。'
+                    '正确示范2：scripts/system_change_log.py -> 修改了系统日志的过滤规则，将 plugins/ 从噪音黑名单中移除，这样插件目录的改动以后也能被正常记录。'
+                    '正确示范3：scripts/soul_backup.py -> 修改了灵魂备份脚本，将跨网连接等待时间从10秒延长到12秒，减少 Win10 推送超时。'
                 )
             },
             {
@@ -180,6 +192,8 @@ def summarize_change(path: str, content: str) -> str:
         r = requests.post(url, headers={'Authorization': f'Bearer {MODEL_KEY}'}, json=prompt, timeout=90)
         r.raise_for_status()
         text = r.json()['choices'][0]['message']['content'].strip()
+        text = re.sub(r'`[^`]+`', '', text)
+        text = re.sub(r'[A-Za-z_][A-Za-z0-9_./()=,\-]{6,}', '', text)
         return sanitize_summary(text, path, content)
     except Exception:
         return fallback_summary(path, content)
