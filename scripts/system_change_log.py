@@ -36,6 +36,23 @@ def run(cmd, check=True):
     return (p.stdout or '').strip()
 
 
+def _score_path(path: str) -> tuple:
+    score = 100
+    if path.startswith('scripts/'):
+        score -= 50
+    if path.endswith(('.py', '.sh', '.md', '.json')):
+        score -= 20
+    if path == '.gitignore':
+        score -= 30
+    if path.startswith('memory/'):
+        score += 30
+    if path.startswith('reports/'):
+        score += 20
+    if path.endswith(('.log', '.jsonl')):
+        score += 40
+    return (score, path)
+
+
 def tracked_changes():
     names = []
     for cmd in (
@@ -48,6 +65,7 @@ def tracked_changes():
             line = line.strip()
             if line and line not in names:
                 names.append(line)
+    names.sort(key=_score_path)
     return names[:MAX_FILES]
 
 
