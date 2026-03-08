@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Logs / runtime state
+*.log
+*.out
+*.pid
+*.pid.lock
+
+# Drafts / audit trails
+*.draft
+*.jsonl
+
+# Temp / probe / cache
+tmp_*/
+.tmp/
+.cache/
+
+# Local agent/runtime noise
+.openclaw/
+memory-lancedb-pro/
+
+# Generated runtime artifacts
+reports/*-last-run.log
+reports/send-logs/*.json
+reports/approval-outbox/*.md
+reports/cyber-exchange/*.draft
+reports/cyber-exchange/*.md
+reports/global-intel-*.md
+reports/global-intel-latest.md
+reports/*-audit.jsonl
+memory/*_state.json
+memory/*state.json
+memory/*_monitor.log
+memory/*_cron.log
+memory/*.log
+memory/*.jsonl
+one_shot_codespaces_config.out
+
+# Local heavy artifacts in sync repo
+github_sync/laicai-007/target_screenshot.png
+github_sync/laicai-007/phantom_status.txt
+github_sync/laicai-007/heavy_scraper_runtime.log
+
+# Workspace bootstrap/persona files are prompt context, not repo changes
+AGENTS.md
+BOOTSTRAP.md
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+USER.md

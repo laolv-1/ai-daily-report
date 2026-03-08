@@ -5,6 +5,9 @@ import subprocess
 from pathlib import Path
 
 import paramiko
+import requests
+
+from github_sync_helper import copy_into_repo, commit_and_push, dated_rel_path
 
 ROOT = Path('/root/.openclaw/workspace')
 REPORTS = ROOT / 'reports'
@@ -13,62 +16,129 @@ WIN_HOST = '100.89.160.67'
 WIN_USER = 'Administrator'
 WIN_PASSWORD = 'As1231'
 REMOTE_BASE = 'D:/来财/系统更新日志'
-DEFAULT_SKILLS = [
-    Path('/root/openclaw/skills/skill_context_refresh.md'),
-    Path('/root/openclaw/skills/skill_tool_roi_scheduler.md'),
-]
-DEFAULT_FILES = [
-    ROOT / 'scripts' / 'soul_backup.py',
-    ROOT / 'scripts' / 'soul_backup.cron.sh',
-    ROOT / 'scripts' / 'system_change_log.py',
-    ROOT / 'scripts' / 'system_change_watchdog.py',
-    ROOT / 'scripts' / 'cyber_exchange_audit.py',
-    Path('/root/.openclaw/openclaw.json'),
-]
+MODEL_BASE = 'http://74.48.182.210:8317/v1'
+MODEL_KEY = 'xDjn0xIm6ztThd8pSexN8CmCRttLtt8T'
+MODEL_NAME = 'lck/gpt-5.4'
+MAX_FILES = 12
 
 
-def run(cmd):
-    return subprocess.check_output(cmd, cwd=str(ROOT), text=True, stderr=subprocess.STDOUT).strip()
+def run(cmd, check=True):
+    p = subprocess.run(cmd, cwd=str(ROOT), text=True, capture_output=True)
+    if check and p.returncode != 0:
+        raise RuntimeError((p.stdout or '') + '\n' + (p.stderr or ''))
+    return (p.stdout or '').strip()
 
 
-def collect_git_status():
+def changed_files(limit=MAX_FILES):
+    lines = run(['git', 'status', '--short']).splitlines()
+    cleaned = []
+    for line in lines:
+        if not line.strip():
+            continue
+        path = line[3:].strip()
+        if not path:
+            continue
+        cleaned.append(path)
+    return cleaned[:limit]
+
+
+def file_mtime(path: Path) -> str:
+    if not path.exists():
+        return '未落盘'
+    ts = dt.datetime.fromtimestamp(path.stat().st_mtime, dt.timezone(dt.timedelta(hours=8)))
+    return ts.strftime('%Y-%m-%d %H:%M:%S BJT')
+
+
+def diff_for(path: str) -> str:
     try:
-        return run(['git', 'status', '--short'])
+        if path.startswith('/root/'):
+            p = Path(path)
+            if not p.exists():
+                return f'文件不存在：{path}'
+            text = p.read_text(encoding='utf-8', errors='ignore')
+            return text[:4000]
+        diff = run(['git', 'diff', '--', path], check=False)
+        if diff.strip():
+            return diff[:5000]
+        p = ROOT / path
+        if p.exists():
+            return p.read_text(encoding='utf-8', errors='ignore')[:4000]
+        return f'文件不存在：{path}'
     except Exception as e:
-        return f'[git status unavailable] {e}'
+        return f'无法读取差异：{path} | {e}'
 
 
-def collect_recent_commits(limit=5):
-    try:
-        return run(['git', 'log', f'-{limit}', '--pretty=format:%h %s'])
-    except Exception as e:
-        return f'[git log unavailable] {e}'
+def summarize_change(path: str, content: str) -> str:
+    prompt = {
+        'model': MODEL_NAME,
+        'messages': [
+            {
+                'role': 'system',
+                'content': (
+                    '你是系统变更审计官。你的任务是把代码差异翻译成主公一眼能看懂的人话。'
+                    '只输出一句中文短句，不要解释过程，不要说可能，也不要输出 Markdown 列表。'
+                    '输出风格必须像：增加了 Polymarket 强制等待 15 秒的逻辑；修复了 Win10 中文路径桥接；加入了双因子硬校验。'
+                    '如果是状态文件或日志文件，就简洁说明它记录了什么运行状态。'
+                )
+            },
+            {
+                'role': 'user',
+                'content': json.dumps({'file': path, 'content': content[:3500]}, ensure_ascii=False)
+            }
+        ],
+        'temperature': 0.2,
+    }
+    url = MODEL_BASE.rstrip('/') + '/chat/completions'
+    r = requests.post(url, headers={'Authorization': f'Bearer {MODEL_KEY}'}, json=prompt, timeout=90)
+    r.raise_for_status()
+    text = r.json()['choices'][0]['message']['content'].strip()
+    return text.replace('\n', ' ').strip(' -')
+
+
+def collect_entries(extra_notes=''):
+    now = dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
+    entries = []
+    for rel in changed_files():
+        p = ROOT / rel
+        human = summarize_change(rel, diff_for(rel))
+        entries.append({
+            'time': file_mtime(p),
+            'file': rel,
+            'summary': human,
+        })
+    if extra_notes.strip():
+        entries.append({
+            'time': now.strftime('%Y-%m-%d %H:%M:%S BJT'),
+            'file': '本次补充说明',
+            'summary': extra_notes.strip(),
+        })
+    return entries
 
 
 def build_log(extra_notes=''):
     now = dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
     date_str = now.strftime('%Y-%m-%d')
-    body = [f'# 系统变更日志｜{date_str}', '', '## 今日概况', '自动记录本体与蜂群的代码改动、配置修改、新技能固化。', '']
-    body += ['## 新技能固化']
-    found = False
-    for p in DEFAULT_SKILLS:
-        if p.exists():
-            found = True
-            body.append(f'- {p}')
-    if not found:
-        body.append('- 无')
-    body += ['', '## 关键物理文件']
-    found_files = False
-    for p in DEFAULT_FILES:
-        if p.exists():
-            found_files = True
-            body.append(f'- {p}')
-    if not found_files:
-        body.append('- 无')
-    body += ['', '## 近期提交', '```', collect_recent_commits(), '```', '', '## 当前工作区状态', '```', collect_git_status(), '```']
-    if extra_notes.strip():
-        body += ['', '## 本次补充说明', extra_notes.strip()]
-    return '\n'.join(body)
+    entries = collect_entries(extra_notes)
+    lines = [
+        f'# 系统变更日志｜{date_str}',
+        '',
+        '## 今日变更摘要',
+        '以下内容已从真实代码差异与文件变更中翻译为人话：',
+        '',
+    ]
+    if not entries:
+        lines.append('- [无变更] 今日未发现需要上报的核心改动。')
+    else:
+        for item in entries:
+            lines.append(f"- [{item['time']}] `{item['file']}`：{item['summary']}")
+    lines += [
+        '',
+        '## 最近提交',
+        '```',
+        run(['git', 'log', '-5', '--pretty=format:%h %s'], check=False) or '无',
+        '```',
+    ]
+    return '\n'.join(lines)
 
 
 def push_to_win10(local_file: Path):
@@ -97,6 +167,13 @@ def push_to_win10(local_file: Path):
     return remote_file, len(data)
 
 
+def sync_to_github(local_file: Path) -> dict:
+    filename = local_file.name
+    rel = dated_rel_path('system-change-logs', filename)
+    copy_into_repo(local_file, rel)
+    return commit_and_push(f'系统变更日志: {filename}')
+
+
 def main(extra_notes=''):
     now = dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
     file = REPORTS / f'{now.strftime("%Y-%m-%d")}_update_log.md'
@@ -104,10 +181,12 @@ def main(extra_notes=''):
     text = build_log(extra_notes)
     file.write_text(text, encoding='utf-8')
     remote_file, size = push_to_win10(file)
+    github = sync_to_github(file)
     state = {
         'last_push_bjt': now.strftime('%Y-%m-%d %H:%M:%S'),
         'remote_file': remote_file,
         'size': size,
+        'github': github,
     }
     (MEMORY / 'system_change_log_state.json').write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf-8')
     print(json.dumps(state, ensure_ascii=False))
