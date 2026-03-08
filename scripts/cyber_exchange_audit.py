@@ -27,6 +27,11 @@ HIGH_VALUE_SCORE = 12
 ALLOWED_BJT_HOURS = {0, 12}
 
 
+def is_bjt_delivery_window(now: dt.datetime | None = None) -> bool:
+    now = now or dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
+    return now.minute == 0 and now.hour in ALLOWED_BJT_HOURS
+
+
 def load_laicai_bot_token() -> str:
     obj = json.loads(OPENCLAW_CONFIG.read_text(encoding='utf-8'))
     return obj['channels']['telegram']['botToken']
@@ -188,7 +193,7 @@ def write_approval_outbox(text: str, remote_name: str) -> Path:
 
 def enforce_bjt_delivery_window() -> None:
     now = dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
-    if now.minute == 0 and now.hour in ALLOWED_BJT_HOURS:
+    if is_bjt_delivery_window(now):
         return
     log_line(f'SILENT_EXIT outside_bjt_window now={now.strftime("%Y-%m-%d %H:%M:%S %Z") or "BJT"}')
     raise SystemExit(0)
@@ -212,10 +217,10 @@ def send_report(text: str):
 
 def main():
     try:
+        enforce_bjt_delivery_window()
         item = pick_new_high_value_draft()
         if not item:
             raise SystemExit(0)
-        enforce_bjt_delivery_window()
         approval_request = build_approval_request(item)
         approval_out = write_approval_outbox(approval_request, item['remote_name'])
         send_result = send_report(approval_request)
@@ -229,6 +234,9 @@ def main():
     except SystemExit:
         raise
     except Exception as e:
+        if not is_bjt_delivery_window():
+            log_line(f'SILENT_EXIT suppressed_exception_outside_bjt_window type={type(e).__name__}')
+            raise SystemExit(0)
         log_line(f'ERROR {type(e).__name__}: {e}')
         raise
 
