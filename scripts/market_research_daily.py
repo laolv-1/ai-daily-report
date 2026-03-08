@@ -12,6 +12,8 @@ from pathlib import Path
 import paramiko
 import requests
 
+from github_sync_helper import commit_and_push, copy_into_repo, dated_rel_path
+
 ROOT = Path('/root/.openclaw/workspace')
 ALIYUN_HOST = '100.82.179.92'
 ALIYUN_USER = 'root'
@@ -82,7 +84,7 @@ def fetch_reddit(limit_per_sub: int = 8):
     for sub, mode in SUBREDDITS:
         url = f'https://www.reddit.com/r/{sub}/{mode}.json?limit={limit_per_sub}&raw_json=1'
         try:
-            r = requests.get(url, headers=headers, timeout=20)
+            r = requests.get(url, headers=headers, timeout=25)
             r.raise_for_status()
             data = r.json()['data']['children']
         except Exception as e:
@@ -253,6 +255,18 @@ def push_to_win10(report: str):
     return remote_file, len(data)
 
 
+def sync_to_github(report: str) -> dict:
+    now = dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
+    tmp = ROOT / 'memory' / '_market_research_github.md'
+    tmp.write_text(report, encoding='utf-8')
+    try:
+        rel = dated_rel_path('market-research', f'{now.strftime("%Y-%m-%d")}_ClawWork.md')
+        copy_into_repo(tmp, rel)
+        return commit_and_push(f'市场调研: {now.strftime("%Y-%m-%d %H:%M:%S BJT")}')
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def save_state(state: dict):
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf-8')
@@ -271,6 +285,7 @@ def main():
     report = render_report(rows)
     tg = send_to_laifu(report)
     remote_file, size = push_to_win10(report)
+    github = sync_to_github(report)
     cleanup_local_artifacts()
     state = {
         'last_run_bjt': dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S'),
@@ -279,9 +294,10 @@ def main():
         'win10_size': size,
         'internal_count': len(internal),
         'reddit_count': len(reddit),
+        'github': github,
     }
     save_state(state)
-    log(f"OK tg_message_id={state['telegram_message_id']} win10={remote_file} size={size} internal={len(internal)} reddit={len(reddit)}")
+    log(f"OK tg_message_id={state['telegram_message_id']} win10={remote_file} size={size} internal={len(internal)} reddit={len(reddit)} github={json.dumps(github, ensure_ascii=False)}")
     print(json.dumps(state, ensure_ascii=False))
 
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import datetime as dt
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -19,7 +20,13 @@ REMOTE_BASE = 'D:/来财/系统更新日志'
 MODEL_BASE = 'http://74.48.182.210:8317/v1'
 MODEL_KEY = 'xDjn0xIm6ztThd8pSexN8CmCRttLtt8T'
 MODEL_NAME = 'lck/gpt-5.4'
-MAX_FILES = 12
+MAX_FILES = 10
+MAX_DIFF_CHARS = 6000
+BLACKLIST_PHRASES = [
+    '更新了逻辑', '修改了逻辑', '优化了代码', '修改了配置', '更改了状态',
+    '更新了文档', '更新了说明文字', '调整了逻辑', '做了优化', '做了调整',
+    '更新了该文件的逻辑或运行状态', '更新了状态记录或结构化配置'
+]
 
 
 def run(cmd, check=True):
@@ -29,17 +36,19 @@ def run(cmd, check=True):
     return (p.stdout or '').strip()
 
 
-def changed_files(limit=MAX_FILES):
-    lines = run(['git', 'status', '--short']).splitlines()
-    cleaned = []
-    for line in lines:
-        if not line.strip():
-            continue
-        path = line[3:].strip()
-        if not path:
-            continue
-        cleaned.append(path)
-    return cleaned[:limit]
+def tracked_changes():
+    names = []
+    for cmd in (
+        ['git', 'diff', '--name-only'],
+        ['git', 'diff', '--cached', '--name-only'],
+        ['git', 'ls-files', '--others', '--exclude-standard'],
+    ):
+        out = run(cmd, check=False)
+        for line in out.splitlines():
+            line = line.strip()
+            if line and line not in names:
+                names.append(line)
+    return names[:MAX_FILES]
 
 
 def file_mtime(path: Path) -> str:
@@ -49,6 +58,11 @@ def file_mtime(path: Path) -> str:
     return ts.strftime('%Y-%m-%d %H:%M:%S BJT')
 
 
+def is_untracked(path: str) -> bool:
+    out = run(['git', 'ls-files', '--others', '--exclude-standard', '--', path], check=False)
+    return bool(out.strip())
+
+
 def diff_for(path: str) -> str:
     try:
         if path.startswith('/root/'):
@@ -56,39 +70,92 @@ def diff_for(path: str) -> str:
             if not p.exists():
                 return f'文件不存在：{path}'
             text = p.read_text(encoding='utf-8', errors='ignore')
-            return text[:4000]
+            return f'FILE_CONTENT\n{text[:MAX_DIFF_CHARS]}'
+        if is_untracked(path):
+            p = ROOT / path
+            if p.exists():
+                text = p.read_text(encoding='utf-8', errors='ignore')
+                return f'UNTRACKED_FILE\n{text[:MAX_DIFF_CHARS]}'
         diff = run(['git', 'diff', '--', path], check=False)
-        if diff.strip():
-            return diff[:5000]
+        cached = run(['git', 'diff', '--cached', '--', path], check=False)
+        merged = '\n'.join(part for part in [cached, diff] if part.strip()).strip()
+        if merged:
+            return merged[:MAX_DIFF_CHARS]
         p = ROOT / path
         if p.exists():
-            return p.read_text(encoding='utf-8', errors='ignore')[:4000]
+            return f'FILE_CONTENT\n{p.read_text(encoding="utf-8", errors="ignore")[:MAX_DIFF_CHARS]}'
         return f'文件不存在：{path}'
     except Exception as e:
         return f'无法读取差异：{path} | {e}'
 
 
+def meaningful_lines(diff_text: str, limit: int = 4):
+    out = []
+    for raw in diff_text.splitlines():
+        if raw.startswith(('+++', '---', '@@', 'diff --git', 'index ')):
+            continue
+        if raw.startswith('+') or raw.startswith('-'):
+            line = raw[1:].strip()
+            if not line:
+                continue
+            if line in ('{', '}', '[', ']', '(', ')'):
+                continue
+            out.append(line)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def extract_tokens(diff_text: str, limit: int = 6):
+    tokens = []
+    seen = set()
+    patterns = [
+        r'[A-Za-z_][A-Za-z0-9_]{2,}',
+        r'\b\d+(?:\.\d+)?\b',
+        r"'[^'\n]{2,80}'",
+        r'"[^"\n]{2,80}"',
+    ]
+    for pat in patterns:
+        for m in re.findall(pat, diff_text):
+            tok = str(m).strip()
+            if tok in seen:
+                continue
+            if tok.lower() in {'true', 'false', 'none', 'json', 'utf', 'ignore'}:
+                continue
+            seen.add(tok)
+            tokens.append(tok)
+            if len(tokens) >= limit:
+                return tokens
+    return tokens
+
+
 def fallback_summary(path: str, content: str) -> str:
-    low = (content or '').lower()
-    if path == '.gitignore':
-        return '新增全局忽略规则，清理日志、草稿、审计记录、临时目录和运行噪音。'
-    if path.endswith('system_change_log.py'):
-        return '把系统变更日志从机器状态输出升级为人话摘要，并补上 GitHub 双端归档与失败兜底。'
-    if path.endswith('polymarket_phantom_hunt.py'):
-        return '新增 Polymarket 幽灵狩猎接应脚本，加入清场、硬校验、删机甲和 Win10 桥接闭环。'
-    if path.endswith('heavy_scraper.py'):
-        return '调整网页渲染与截图逻辑，优化动态站点等待策略和战利品回传链路。'
-    if 'playwright install --with-deps chromium' in low:
-        return '补齐 Playwright 与 Chromium 系统依赖安装逻辑。'
-    if 'wait_for_timeout(15000)' in content:
-        return '增加了动态网页强制等待 15 秒的逻辑，避免长连接页面过早截图。'
-    if 'networkidle' in low and 'domcontentloaded' in low:
-        return '把等待策略从 networkidle 改为更稳的 domcontentloaded 路线。'
-    if path.endswith('.md'):
-        return '更新了文档或说明文字。'
-    if path.endswith('.json'):
-        return '更新了状态记录或结构化配置。'
-    return '更新了该文件的逻辑或运行状态。'
+    lines = meaningful_lines(content, limit=4)
+    tokens = extract_tokens(content, limit=6)
+    if lines:
+        quoted = '；'.join(lines[:2])
+        if len(quoted) > 160:
+            quoted = quoted[:157] + '...'
+        return f'关键改动直接体现在代码差异：{quoted}'
+    if tokens:
+        return f'本次变更涉及关键标记：{", ".join(tokens[:6])}'
+    p = ROOT / path
+    if p.exists():
+        head = p.read_text(encoding='utf-8', errors='ignore')[:160].replace('\n', ' ')
+        return f'该文件当前开头内容为：{head}'
+    return '该文件有变更，但当前未能提取出可读差异片段。'
+
+
+def sanitize_summary(text: str, path: str, content: str) -> str:
+    text = re.sub(r'\s+', ' ', (text or '')).strip(' -：:')
+    if not text:
+        return fallback_summary(path, content)
+    for bad in BLACKLIST_PHRASES:
+        if bad in text:
+            return fallback_summary(path, content)
+    if len(text) < 10:
+        return fallback_summary(path, content)
+    return text
 
 
 def summarize_change(path: str, content: str) -> str:
@@ -98,26 +165,28 @@ def summarize_change(path: str, content: str) -> str:
             {
                 'role': 'system',
                 'content': (
-                    '你是系统变更审计官。你的任务是把代码差异翻译成主公一眼能看懂的人话。'
-                    '只输出一句中文短句，不要解释过程，不要说可能，也不要输出 Markdown 列表。'
-                    '输出风格必须像：增加了 Polymarket 强制等待 15 秒的逻辑；修复了 Win10 中文路径桥接；加入了双因子硬校验。'
-                    '如果是状态文件或日志文件，就简洁说明它记录了什么运行状态。'
+                    '你是系统变更审计官。你必须把 git diff 翻译成一句可复盘的中文战术简报。'
+                    '你只能根据我给你的真实差异内容作答，必须点出具体函数名、变量名、参数值、阈值、超时时间、文件路径、提交文案或核心文案变化。'
+                    '严禁使用以下废话：更新了逻辑、修改了配置、优化了代码、更改了状态、更新了文档、做了调整、运行状态变化。'
+                    '如果 diff 里出现数值变化，必须写出“从多少改到多少”。'
+                    '如果 diff 里出现函数名、变量名、字段名、文件路径，必须至少点名 1-2 个。'
+                    '输出只允许一句中文，不要前言，不要解释过程，不要模糊词，不要套话。'
+                    '示例：将 MAX_FILES 从 12 改为 10，并新增 BLACKLIST_PHRASES 黑名单来拦截“更新了逻辑”这类废话。'
                 )
             },
             {
                 'role': 'user',
-                'content': json.dumps({'file': path, 'content': content[:3500]}, ensure_ascii=False)
+                'content': json.dumps({'file': path, 'git_diff': content[:4200]}, ensure_ascii=False)
             }
         ],
-        'temperature': 0.2,
+        'temperature': 0.1,
     }
     try:
         url = MODEL_BASE.rstrip('/') + '/chat/completions'
         r = requests.post(url, headers={'Authorization': f'Bearer {MODEL_KEY}'}, json=prompt, timeout=90)
         r.raise_for_status()
         text = r.json()['choices'][0]['message']['content'].strip()
-        text = text.replace('\n', ' ').strip(' -')
-        return text or fallback_summary(path, content)
+        return sanitize_summary(text, path, content)
     except Exception:
         return fallback_summary(path, content)
 
@@ -125,9 +194,10 @@ def summarize_change(path: str, content: str) -> str:
 def collect_entries(extra_notes=''):
     now = dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
     entries = []
-    for rel in changed_files():
+    for rel in tracked_changes():
         p = ROOT / rel
-        human = summarize_change(rel, diff_for(rel))
+        diff_text = diff_for(rel)
+        human = summarize_change(rel, diff_text)
         entries.append({
             'time': file_mtime(p),
             'file': rel,
@@ -150,7 +220,7 @@ def build_log(extra_notes=''):
         f'# 系统变更日志｜{date_str}',
         '',
         '## 今日变更摘要',
-        '以下内容已从真实代码差异与文件变更中翻译为人话：',
+        '以下内容已基于真实 git diff 生成，目标是让主公能直接复盘具体动作：',
         '',
     ]
     if not entries:

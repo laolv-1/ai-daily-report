@@ -5,6 +5,8 @@ from pathlib import Path
 
 import paramiko
 
+from github_sync_helper import commit_and_push, copy_into_repo, dated_rel_path
+
 ROOT = Path('/root/.openclaw/workspace')
 WIN_HOST = '100.89.160.67'
 WIN_USER = 'Administrator'
@@ -67,7 +69,7 @@ def push_to_win10(text: str):
 
     cli = paramiko.SSHClient()
     cli.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    cli.connect(hostname=WIN_HOST, username=WIN_USER, password=WIN_PASSWORD, timeout=10, banner_timeout=10, auth_timeout=10)
+    cli.connect(hostname=WIN_HOST, username=WIN_USER, password=WIN_PASSWORD, timeout=12, banner_timeout=12, auth_timeout=12)
     try:
         cmd = f'powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path \'{remote_dir}\' | Out-Null"'
         stdin, stdout, stderr = cli.exec_command(cmd, timeout=20)
@@ -90,11 +92,24 @@ def push_to_win10(text: str):
     return remote_file, len(data)
 
 
-def write_state(remote_file: str, size: int) -> None:
+def sync_to_github(text: str) -> dict:
+    now = dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
+    tmp = ROOT / 'memory' / '_soul_backup_github.md'
+    tmp.write_text(text, encoding='utf-8')
+    try:
+        rel = dated_rel_path('soul-backups', f'laicai-soul-backup-{now.strftime("%Y%m%d-%H%M%S")}.md')
+        copy_into_repo(tmp, rel)
+        return commit_and_push(f'备份: {now.strftime("%Y-%m-%d %H:%M:%S BJT")}')
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def write_state(remote_file: str, size: int, github: dict | None = None) -> None:
     payload = {
         'last_backup_bjt': dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S'),
         'remote_file': remote_file,
         'size': size,
+        'github': github or {},
     }
     LOCAL_STATE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
 
@@ -102,9 +117,10 @@ def write_state(remote_file: str, size: int) -> None:
 def main():
     text = build_backup_text()
     remote_file, size = push_to_win10(text)
-    write_state(remote_file, size)
-    log(f'BACKUP_OK remote={remote_file} size={size}')
-    print(json.dumps({'remote_file': remote_file, 'size': size}, ensure_ascii=False))
+    github = sync_to_github(text)
+    write_state(remote_file, size, github)
+    log(f'BACKUP_OK remote={remote_file} size={size} github={json.dumps(github, ensure_ascii=False)}')
+    print(json.dumps({'remote_file': remote_file, 'size': size, 'github': github}, ensure_ascii=False))
 
 
 if __name__ == '__main__':
