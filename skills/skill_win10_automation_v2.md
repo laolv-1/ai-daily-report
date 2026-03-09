@@ -243,6 +243,24 @@ TITLE=YouTube
 
 ## 六、官方插件接管法（Chrome Extension Relay）
 
+### 2026-03-10 实战胜利回执（Win10 Profile 2 真身）
+
+- 主公手动完成扩展加载、Options 填入 Gateway Token、目标标签页点击扩展，最终徽标为 **ON**
+- Win10 本机官方 CLI 真实回执：
+  - `openclaw browser --browser-profile chrome tabs`
+  - 返回：
+    - `1. YouTube`
+    - `https://www.youtube.com/`
+    - `id: 94109D4A37A7D801CD4DEAF4564AA4FE`
+- Win10 本机官方 CLI `snapshot` 成功抓到 YouTube 页面结构树
+- 因此后续 Win10 浏览器接管唯一标准 SOP 固化为：
+  1. 保持 Win10 本机 Gateway 正常：`RPC probe: ok`
+  2. 扩展 Options 正确填写 `gateway.auth.token`
+  3. 在 `Profile 2` 目标标签页点击扩展至 **ON**
+  4. 统一使用：`openclaw browser --browser-profile chrome ...`
+- 结论：**停止继续折腾裸 9222；Win10 浏览器标准主路正式切换为官方 Chrome Extension Relay。**
+
+
 ### 1. 定位
 
 当目标是接管 **Win10 上主公真实账号正在使用的 Chrome 标签页** 时，优先使用官方插件法，而不是继续死磕裸 `9222`。
