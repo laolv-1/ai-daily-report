@@ -1,0 +1,13 @@
+{
+  "api_id": 31204443,
+  "api_hash": "db19af107c06da4dc9a6d1c50c58a0f6",
+  "bot_token": "8737672051:AAH9NkDpSW8YwKs18g8RAcKJn4Cysu9VoFM",
+  "admin_ids": [7392107275],
+  "announcement_msg": "这里填写你的合规公告内容",
+  "interval_minutes": 30,
+  "whitelist_groups": [],
+  "is_running": false,
+  "last_broadcast_at": null,
+  "last_round_summary": "",
+  "audit_log": []
+}
