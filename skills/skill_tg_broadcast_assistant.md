@@ -104,6 +104,95 @@ pm2 restart TG-Broadcast-Assistant
 5. `/approve_all` / `/approve` 将候选池写入 `approved_groups`
 6. `broadcaster_loop()` 中只对 `approved_groups` 逐个发送，并在每个群之间严格休眠
 
+## 实战操作手册（Telegram 控制端）
+
+推荐主公在机器人对话框按这个顺序操作：
+
+1. `/discover`
+   - 作用：扫描当前操作员账号已加入的群组，建立候选池
+   - 预期：机器人返回候选群列表，并提示可用 `/approve_all` 或 `/approve`
+
+2. `/approve_all`
+   - 作用：一键把全部候选群写入授权池
+   - 预期：机器人返回“已批准 X 个群进入授权池”
+   - 若只想选部分群：改用 `/approve 1 2 3`
+
+3. `/targets`
+   - 作用：查看当前授权池，确认本轮到底会发给哪些群
+   - 预期：机器人返回已批准群列表
+
+4. `/msg 这里填写公告内容`
+   - 作用：设置本轮广播内容
+   - 预期：机器人返回“公告内容已更新”
+
+5. `/time 30`
+   - 作用：设置群与群之间的发送间隔（单位：分钟）
+   - 预期：机器人返回“合规发送间隔已设为 30 分钟/群”
+
+6. `/start`
+   - 作用：启动广播循环
+   - 预期：机器人返回“已开始合规广播（仅已批准授权池，严格按分钟间隔发送）”
+
+7. `/status`
+   - 作用：查看当前运行状态、候选池数、授权池数、最近一轮结果、最近审计
+   - 预期：机器人返回状态卡片
+
+8. `/stop`
+   - 作用：立刻停止广播
+   - 预期：机器人返回“已停止广播”
+
+## 换号 SOP（HK 终端）
+
+当旧号风控、封号、或要切新业务线账号时，严格按以下顺序执行：
+
+1. 停止守护进程
+
+```bash
+cd /root/hk_tg_broadcast
+pm2 stop TG-Broadcast-Assistant
+```
+
+2. 删除旧操作员凭证
+
+```bash
+cd /root/hk_tg_broadcast
+rm -f user_operator.session
+```
+
+3. 重新绑定新号
+
+```bash
+cd /root/hk_tg_broadcast
+python3 login.py
+```
+
+按提示输入：
+- 新手机号
+- 验证码
+- 如有二步验证密码，再输入密码
+
+4. 重启守护进程
+
+```bash
+cd /root/hk_tg_broadcast
+pm2 restart TG-Broadcast-Assistant
+```
+
+5. 验证是否在线
+
+```bash
+pm2 status
+pm2 logs TG-Broadcast-Assistant --lines 30
+```
+
+## 运营注意事项
+
+- 每次切新号后，先执行一次 `/discover`
+- 再执行 `/approve_all` 或 `/approve ...` 重建授权池
+- 开始广播前，务必先用 `/targets` 确认授权池内容
+- 若机器人无响应，先查 `pm2 logs TG-Broadcast-Assistant`
+- 若主脚本报未授权，优先检查 `user_operator.session` 是否存在
+
 ## 资产原则
 
 这是一个**合规广播自动化资产**，重点是候选发现、人工审批、持久授权池、审计、低频、可停机，不是扫群即发工具，不是攻击工具。
