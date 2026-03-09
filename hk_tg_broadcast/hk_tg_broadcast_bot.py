@@ -23,7 +23,8 @@ DEFAULT_CONFIG = {
     'admin_ids': [7392107275],
     'announcement_msg': '这里填写你的合规公告内容',
     'interval_minutes': 30,
-    'whitelist_groups': [],
+    'approved_groups': [],
+    'discovered_groups': [],
     'is_running': False,
     'last_broadcast_at': None,
     'last_round_summary': '',
@@ -44,6 +45,8 @@ def load_config() -> dict[str, Any]:
     data = json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
     merged = dict(DEFAULT_CONFIG)
     merged.update(data)
+    if 'whitelist_groups' in data and not merged.get('approved_groups'):
+        merged['approved_groups'] = [{'id': int(x), 'title': str(x)} for x in data.get('whitelist_groups', [])]
     return merged
 
 
@@ -60,7 +63,17 @@ def append_audit(data: dict[str, Any], message: str) -> None:
     logging.info(message)
 
 
-def parse_target_ids(raw: str) -> list[int]:
+def is_allowed_admin(data: dict[str, Any], user_id: int | None) -> bool:
+    return user_id is not None and user_id in set(data.get('admin_ids', []))
+
+
+def format_group_rows(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return '暂无'
+    return '\n'.join([f"{idx}. {item.get('title', 'unknown')} | {item.get('id')}" for idx, item in enumerate(rows, start=1)])
+
+
+def parse_selection(raw: str) -> list[int]:
     raw = raw.replace('\n', ' ').replace(',', ' ')
     out: list[int] = []
     for part in raw.split():
@@ -71,17 +84,31 @@ def parse_target_ids(raw: str) -> list[int]:
     return sorted(set(out))
 
 
-def is_allowed_admin(data: dict[str, Any], user_id: int | None) -> bool:
-    return user_id is not None and user_id in set(data.get('admin_ids', []))
-
-
 async def safe_reply(event, text: str) -> None:
     await event.reply(text)
 
 
-async def fetch_authorized_targets(user_client: TelegramClient, whitelist_ids: list[int]):
+async def discover_groups(user_client: TelegramClient) -> list[dict[str, Any]]:
+    found: list[dict[str, Any]] = []
+    async for dialog in user_client.iter_dialogs():
+        entity = dialog.entity
+        if getattr(dialog, 'is_group', False) or getattr(dialog, 'is_channel', False):
+            if isinstance(entity, (Channel, Chat)):
+                found.append({
+                    'id': int(getattr(entity, 'id', 0)) if not str(getattr(entity, 'id', '')).startswith('-100') else int(getattr(entity, 'id')),
+                    'peer_id': int(dialog.id),
+                    'title': dialog.name or str(dialog.id),
+                })
+    unique = {}
+    for item in found:
+        unique[int(item['peer_id'])] = {'id': int(item['peer_id']), 'title': item['title']}
+    return list(unique.values())
+
+
+async def fetch_approved_targets(user_client: TelegramClient, approved_rows: list[dict[str, Any]]):
     entities = []
-    for gid in whitelist_ids:
+    for row in approved_rows:
+        gid = int(row['id'])
         try:
             ent = await user_client.get_entity(gid)
             if isinstance(ent, (Channel, Chat)):
@@ -100,7 +127,7 @@ async def broadcaster_loop(bot_client: TelegramClient, user_client: TelegramClie
 
         msg = (data.get('announcement_msg') or '').strip()
         interval = max(int(data.get('interval_minutes', 30)), 1)
-        whitelist = data.get('whitelist_groups', [])
+        approved = data.get('approved_groups', [])
 
         if not msg:
             append_audit(data, '广播未启动：announcement_msg 为空')
@@ -108,16 +135,16 @@ async def broadcaster_loop(bot_client: TelegramClient, user_client: TelegramClie
             save_config(data)
             await asyncio.sleep(5)
             continue
-        if not whitelist:
-            append_audit(data, '广播未启动：白名单为空')
+        if not approved:
+            append_audit(data, '广播未启动：授权池为空，请先 /discover 再 /approve_all 或 /approve')
             data['is_running'] = False
             save_config(data)
             await asyncio.sleep(5)
             continue
 
-        targets = await fetch_authorized_targets(user_client, whitelist)
+        targets = await fetch_approved_targets(user_client, approved)
         if not targets:
-            append_audit(data, '广播未启动：白名单群组均不可达')
+            append_audit(data, '广播未启动：授权池群组均不可达')
             data['is_running'] = False
             save_config(data)
             await asyncio.sleep(10)
@@ -184,19 +211,90 @@ async def main():
         append_audit(data, f'管理员 {event.sender_id} 更新了公告内容')
         await safe_reply(event, '✅ 公告内容已更新')
 
-    @bot_client.on(events.NewMessage(pattern=r'^/targets(?:\s+([\s\S]+))?$'))
-    async def cmd_targets(event):
+    @bot_client.on(events.NewMessage(pattern=r'^/discover$'))
+    async def cmd_discover(event):
+        data = load_config()
+        if not is_allowed_admin(data, event.sender_id):
+            return
+        rows = await discover_groups(user_client)
+        data['discovered_groups'] = rows
+        append_audit(data, f'管理员 {event.sender_id} 扫描到 {len(rows)} 个候选群')
+        preview = format_group_rows(rows[:50])
+        tail = '\n……' if len(rows) > 50 else ''
+        await safe_reply(event, f'🔎 已发现 {len(rows)} 个候选群\n\n{preview}{tail}\n\n可用：/approve_all 或 /approve 1 2 3')
+
+    @bot_client.on(events.NewMessage(pattern=r'^/approve_all$'))
+    async def cmd_approve_all(event):
+        data = load_config()
+        if not is_allowed_admin(data, event.sender_id):
+            return
+        rows = data.get('discovered_groups', [])
+        if not rows:
+            await safe_reply(event, '❌ 候选池为空，先执行 /discover')
+            return
+        data['approved_groups'] = rows
+        append_audit(data, f'管理员 {event.sender_id} 一键批准了全部候选群，共 {len(rows)} 个')
+        await safe_reply(event, f'✅ 已一键批准 {len(rows)} 个群进入授权池')
+
+    @bot_client.on(events.NewMessage(pattern=r'^/approve(?:\s+([\s\S]+))?$'))
+    async def cmd_approve(event):
         data = load_config()
         if not is_allowed_admin(data, event.sender_id):
             return
         raw = event.pattern_match.group(1) or ''
-        ids = parse_target_ids(raw)
-        if not ids:
-            await safe_reply(event, '用法：/targets -1001234567890 -1002222222222')
+        picks = parse_selection(raw)
+        rows = data.get('discovered_groups', [])
+        if not rows:
+            await safe_reply(event, '❌ 候选池为空，先执行 /discover')
             return
-        data['whitelist_groups'] = ids
-        append_audit(data, f'管理员 {event.sender_id} 更新白名单，共 {len(ids)} 个群')
-        await safe_reply(event, '✅ 白名单群组已更新\n' + '\n'.join(str(x) for x in ids))
+        if not picks:
+            await safe_reply(event, '用法：/approve 1 2 3')
+            return
+        chosen = []
+        for idx in picks:
+            if 1 <= idx <= len(rows):
+                chosen.append(rows[idx - 1])
+        if not chosen:
+            await safe_reply(event, '❌ 没有命中有效序号')
+            return
+        existing = {int(x['id']): x for x in data.get('approved_groups', [])}
+        for item in chosen:
+            existing[int(item['id'])] = item
+        data['approved_groups'] = list(existing.values())
+        append_audit(data, f'管理员 {event.sender_id} 批准了 {len(chosen)} 个群进入授权池')
+        await safe_reply(event, '✅ 已批准以下群进入授权池\n' + format_group_rows(chosen))
+
+    @bot_client.on(events.NewMessage(pattern=r'^/remove(?:\s+([\s\S]+))?$'))
+    async def cmd_remove(event):
+        data = load_config()
+        if not is_allowed_admin(data, event.sender_id):
+            return
+        raw = event.pattern_match.group(1) or ''
+        picks = parse_selection(raw)
+        rows = data.get('approved_groups', [])
+        if not rows:
+            await safe_reply(event, '❌ 当前授权池为空')
+            return
+        if not picks:
+            await safe_reply(event, '用法：/remove 1 2 3  （序号基于当前授权池）')
+            return
+        kept, removed = [], []
+        for idx, item in enumerate(rows, start=1):
+            if idx in picks:
+                removed.append(item)
+            else:
+                kept.append(item)
+        data['approved_groups'] = kept
+        append_audit(data, f'管理员 {event.sender_id} 从授权池移除了 {len(removed)} 个群')
+        await safe_reply(event, '🗑️ 已移出以下群\n' + (format_group_rows(removed) if removed else '暂无命中'))
+
+    @bot_client.on(events.NewMessage(pattern=r'^/targets$'))
+    async def cmd_targets(event):
+        data = load_config()
+        if not is_allowed_admin(data, event.sender_id):
+            return
+        rows = data.get('approved_groups', [])
+        await safe_reply(event, f'📚 当前授权池共 {len(rows)} 个\n\n{format_group_rows(rows[:80])}')
 
     @bot_client.on(events.NewMessage(pattern=r'^/time(?:\s+(\d+))?$'))
     async def cmd_time(event):
@@ -217,15 +315,15 @@ async def main():
         data = load_config()
         if not is_allowed_admin(data, event.sender_id):
             return
-        if not data.get('whitelist_groups'):
-            await safe_reply(event, '❌ 白名单为空，先执行 /targets')
+        if not data.get('approved_groups'):
+            await safe_reply(event, '❌ 授权池为空，先执行 /discover，再 /approve_all 或 /approve')
             return
         if not (data.get('announcement_msg') or '').strip():
             await safe_reply(event, '❌ 公告内容为空，先执行 /msg')
             return
         data['is_running'] = True
         append_audit(data, f'管理员 {event.sender_id} 启动了合规广播')
-        await safe_reply(event, '🟢 已开始合规广播（仅白名单群组，严格按分钟间隔发送）')
+        await safe_reply(event, '🟢 已开始合规广播（仅已批准授权池，严格按分钟间隔发送）')
 
     @bot_client.on(events.NewMessage(pattern=r'^/stop$'))
     async def cmd_stop(event):
@@ -246,7 +344,8 @@ async def main():
             '📊 合规广播状态\n'
             f'运行中：{data.get("is_running")}\n'
             f'群间隔：{data.get("interval_minutes")} 分钟\n'
-            f'白名单数：{len(data.get("whitelist_groups", []))}\n'
+            f'候选池数：{len(data.get("discovered_groups", []))}\n'
+            f'授权池数：{len(data.get("approved_groups", []))}\n'
             f'最近一轮：{data.get("last_round_summary") or "暂无"}\n'
             f'最近发送：{data.get("last_broadcast_at") or "暂无"}\n\n'
             '🧾 最近审计\n'
