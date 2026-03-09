@@ -260,6 +260,48 @@ TITLE=YouTube
   4. 统一使用：`openclaw browser --browser-profile chrome ...`
 - 结论：**停止继续折腾裸 9222；Win10 浏览器标准主路正式切换为官方 Chrome Extension Relay。**
 
+## 八、移动端节点扩军 SOP（Android 预备）
+
+### 源码位置
+
+- `/root/openclaw/apps/android`
+
+### 最小出包命令
+
+```bash
+cd /root/openclaw/apps/android
+./gradlew :app:assembleDebug
+```
+
+### 安装到已连接设备
+
+```bash
+cd /root/openclaw/apps/android
+./gradlew :app:installDebug
+```
+
+### 基础前置
+
+- 已安装 Android Studio 或 Android SDK
+- 已配置 `ANDROID_SDK_ROOT` 或 `ANDROID_HOME`
+- Android 端支持较新系统（README 标注 `minSdk 31`）
+
+### 编制化接入主脑
+
+1. 主脑启动 Gateway
+2. Android App 里选择发现到的 Gateway 或手填 host/port
+3. 主脑执行：
+
+```bash
+openclaw nodes pending
+openclaw nodes approve <requestId>
+```
+
+### 战略定位
+
+- Android Node App 当前为**源码态、可随时 Gradle 出 debug APK**
+- 下一阶段优先级：先稳定出包，再做节点配对入编，再评估移动端自动化叠加层
+
 
 ### 1. 定位
 
