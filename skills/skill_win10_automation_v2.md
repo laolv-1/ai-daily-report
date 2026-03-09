@@ -7,6 +7,8 @@
 - OpenClaw Gateway 官方配置对齐与转绿
 - 通过 SSH / 计划任务击穿 Windows 会话隔离
 - 使用 Chrome 原生 `--remote-debugging-port` + `connect_over_cdp` 接管现有 Windows Chrome
+- 使用 **OpenClaw Chrome Extension Relay** 接管 Win10 真实 Chrome 标签页
+- 评估并扩展到 Win10 本地桌面软件控制（IDE / 记事本 / OpenCode / Codex 等）
 - 验收 YouTube 等真实网页标题抓取
 
 本技能基于一次真实实战沉淀，目标机器：
@@ -239,7 +241,159 @@ TITLE=YouTube
 
 ---
 
-## 六、实战判词与后续策略
+## 六、官方插件接管法（Chrome Extension Relay）
+
+### 1. 定位
+
+当目标是接管 **Win10 上主公真实账号正在使用的 Chrome 标签页** 时，优先使用官方插件法，而不是继续死磕裸 `9222`。
+
+官方文档已确认：
+
+- OpenClaw 内建浏览器 profile：`chrome`
+- 扩展链路由三部分组成：
+  - Browser control service
+  - Local relay server（默认 `http://127.0.0.1:18792`）
+  - Chrome MV3 extension（通过 `chrome.debugger` 附着当前 tab）
+- 当 Gateway 不在浏览器本机时，官方推荐在浏览器所在机器运行 **node host** 作为代理
+
+### 2. Win10 已确认的真实物理回执
+
+在 Win10 `100.89.160.67` 上已实跑：
+
+```bat
+"C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd" browser extension install
+"C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd" browser extension path
+```
+
+真实回执：
+
+```text
+~\.openclaw\browser\chrome-extension
+Copied to clipboard.
+Next:
+- Chrome → chrome://extensions → enable “Developer mode”
+- “Load unpacked” → select: ~\.openclaw\browser\chrome-extension
+- Pin “OpenClaw Browser Relay”, then click it on the tab (badge shows ON)
+```
+
+### 3. 标准 SOP
+
+#### Win10 本机准备
+
+1. 执行：
+
+```bat
+"C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd" browser extension install
+"C:\Users\Administrator\AppData\Roaming\npm\openclaw.cmd" browser extension path
+```
+
+2. 在 Chrome 打开：
+
+```text
+chrome://extensions
+```
+
+3. 打开 **Developer mode**
+4. 点击 **Load unpacked**
+5. 选择：
+
+```text
+C:\Users\Administrator\.openclaw\browser\chrome-extension
+```
+
+6. Pin 扩展到工具栏
+
+#### 主公首次 Attach
+
+1. 用 **Profile 2** 打开目标真实标签页
+2. 点击工具栏里的 **OpenClaw Browser Relay**
+3. 若 badge 显示 `ON`，表示该标签页已附着
+4. 后续主脑通过：
+   - `browser profile="chrome"`
+   - 同一标签页 targetId
+   进行标准控制
+
+### 4. 插件法 vs 裸 CDP 的战略判词
+
+- 裸 CDP 依赖整浏览器实例成功暴露 `9222`，容易被 Win10 会话隔离、Profile 残留和 Chrome 参数吞噬问题击穿
+- 插件法是在 **用户已打开、已登录、已在交互桌面中的真实 tab** 上做显式 attach
+- 因此对于 `Profile 2` 真身账号接管，官方插件法是优先级更高的主路线
+
+### 5. 远程 Gateway 架构建议
+
+如果主脑/Gateway 不在 Win10 本机：
+
+- Win10 应运行 **node host**
+- Gateway 与 node host 保持 **tailnet-only**
+- 不向公网暴露 relay/control 端口
+
+---
+
+## 七、Win10 全系统软件控制扩展（非浏览器）
+
+### 1. 目标
+
+Win10 节点不应只做浏览器代理，还应逐步扩展为：
+
+- 记事本文本录入器
+- IDE / OpenCode / Codex 启动与输入执行端
+- 本地代码运行与结果回传节点
+
+### 2. 当前可用官方主干
+
+当前 OpenClaw 官方原生强项是：
+
+- Gateway
+- node host
+- browser relay
+- nodes / exec / browser 统一调度
+
+也就是说，最稳的主干架构应是：
+
+1. 主脑产出代码/指令
+2. Win10 节点负责本地执行与软件侧动作
+3. 浏览器或终端结果回传主脑
+
+### 3. 技能库现状
+
+ClawHub 检索已命中：
+
+- `windows-ui-automation`
+- `desktop-control-win`
+
+但两者在非交互安装时均被 ClawHub 标记为：
+
+```text
+Warning: flagged as suspicious by VirusTotal Code Insight
+Error: Use --force to install suspicious skills in non-interactive mode
+```
+
+### 4. 当前安全判词
+
+在未完成技能包源码审计前，**禁止为了赶进度直接 `--force` 强装**。
+
+正确顺序：
+
+1. 先完成官方浏览器接管链
+2. 若确需桌面控件技能，再对 `windows-ui-automation` / `desktop-control-win` 做只读审包
+3. 确认无恶意行为、外传风险、危险执行链后，再决定是否安装
+
+### 5. 对 OpenCode / Codex / IDE 的架构建议
+
+最优长期链路应为：
+
+- 主脑：生成代码、生成补丁、生成操作计划
+- Win10：
+  - 使用官方/审计通过的桌面控制技能打开 OpenCode / Codex / IDE
+  - 粘贴主脑给出的代码/命令
+  - 本地运行
+- 浏览器 relay / 终端 / 文件结果：作为回执通道
+
+这条链路成立后，Win10 才真正从“浏览器小弟”升级为“桌面操控官”。
+
+---
+
+## 八、实战判词与后续策略
 
 ### 已确认成立
 
