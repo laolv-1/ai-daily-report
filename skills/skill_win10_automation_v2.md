@@ -275,6 +275,34 @@ TITLE=YouTube
 4. 再以计划任务 `/it` 方式重新点 `Profile 2`
 5. 若仍失败，则继续优先用临时目录法保通，再单独做 Profile 清障
 
+### 本次 `Profile 2` 暴力夺回补充结论
+
+本次已实做以下动作：
+
+- `taskkill /F /IM chrome.exe /T`
+- `taskkill /F /IM GoogleUpdate.exe /T`
+- 删除 `User Data` 与 `Profile 2` 下常见 `Singleton*` 锁文件（若存在）
+- 通过计划任务 `OpenClaw_CDP_Final` 以 `/it /rl HIGHEST /ru Administrator` 启动：
+  - `chrome.exe --profile-directory="Profile 2" --remote-debugging-port=9222`
+
+真实结果：
+
+- `schtasks /run` 成功
+- `schtasks /query /fo LIST /v` 显示任务处于“正在运行 / 交互方式/后台方式”
+- 但 `curl http://127.0.0.1:9222/json/version` 仍返回 `Connection refused`
+- 15 秒延时复核后仍未恢复
+
+因此可追加定性：
+
+> 若“临时目录 + 9222”可通，而“Profile 2 + 9222”在极限清场、删锁、计划任务 `/it` 后仍拒连，则可判定为 `Profile 2` 现有用户态会话/复用链持续吞掉 remote-debugging 参数，不是简单慢启动。
+
+这种情况下，最稳策略不是继续盲点 `Profile 2`，而是：
+
+1. 先用临时目录法保住 CDP 能力
+2. 等主公允许后重启 Win10
+3. 重启后第一时间在交互桌面里点 `Profile 2 --remote-debugging-port=9222`
+4. 若仍失败，再考虑 `Profile 2` 数据层面的深度清障
+
 ---
 
 ## 七、执行层避坑
