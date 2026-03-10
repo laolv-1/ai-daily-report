@@ -1,102 +1,27 @@
 # 系统变更日志｜2026-03-08
 
-## 今日概况
-自动记录本体与蜂群的代码改动、配置修改、新技能固化。
+## 今日变更摘要
+以下内容已从真实代码差异与文件变更中翻译为人话：
 
-## 新技能固化
-- /root/openclaw/skills/skill_context_refresh.md
-- /root/openclaw/skills/skill_tool_roi_scheduler.md
+- [未落盘] `emory/2026-03-08.md`：更新了文档或说明文字。
+- [2026-03-08 18:15:01 BJT] `memory/context_refresh.log`：更新了该文件的逻辑或运行状态。
+- [2026-03-08 18:15:01 BJT] `memory/context_refresh_state.json`：更新了状态记录或结构化配置。
+- [2026-03-08 23:40:15 BJT] `memory/soul_backup_state.json`：更新了状态记录或结构化配置。
+- [2026-03-08 23:50:11 BJT] `memory/system_change_log_state.json`：更新了状态记录或结构化配置。
+- [2026-03-08 23:50:11 BJT] `memory/system_change_watchdog_state.json`：更新了状态记录或结构化配置。
+- [2026-03-08 23:50:01 BJT] `reports/2026-03-08_update_log.md`：更新了文档或说明文字。
+- [2026-03-08 13:00:17 BJT] `reports/global-intel-latest.md`：更新了文档或说明文字。
+- [2026-03-08 20:40:02 BJT] `scripts/market_research_daily.py`：更新了该文件的逻辑或运行状态。
+- [2026-03-08 20:40:02 BJT] `scripts/soul_backup.py`：更新了该文件的逻辑或运行状态。
+- [2026-03-08 20:40:30 BJT] `github_sync/`：更新了该文件的逻辑或运行状态。
+- [2026-03-07 07:40:44 BJT] `memory/2026-03-06-2340.md`：更新了文档或说明文字。
+- [2026-03-08 23:58:31 BJT] `本次补充说明`：本次重构：清理工作区噪音，系统变更日志从机器流水账升级为人话摘要，并保持 Win10 + GitHub 双端归档。
 
-## 关键物理文件
-- /root/.openclaw/workspace/scripts/soul_backup.py
-- /root/.openclaw/workspace/scripts/soul_backup.cron.sh
-- /root/.openclaw/workspace/scripts/system_change_log.py
-- /root/.openclaw/workspace/scripts/system_change_watchdog.py
-- /root/.openclaw/workspace/scripts/cyber_exchange_audit.py
-- /root/.openclaw/openclaw.json
-
-## 近期提交
+## 最近提交
 ```
-641affe Lock approval delivery to BJT windows and add update log
-3c02aa1 Add context refresh guardrail
-8d54ec3 Fix MolTBook approval pickup timing and silent mode
-5e997ae Reformat intel report into dual table layout
-9792e19 Fix bot routing for intel vs approval
+2316db0 Add resilient fallback for humanized change log
+510202d Refine gitignore and humanize system change log
+a4e1866 Append market research radar memory
+5055076 Add daily market research radar
+7ef41c7 Add soul backup and automatic system change logging
 ```
-
-## 当前工作区状态
-```
-M reports/2026-03-08_update_log.md
- M reports/global-intel-latest.md
-?? .openclaw/
-?? AGENTS.md
-?? BOOTSTRAP.md
-?? HEARTBEAT.md
-?? IDENTITY.md
-?? SOUL.md
-?? USER.md
-?? memory-lancedb-pro/
-?? memory/2026-03-06-2340.md
-?? memory/2026-03-06.md
-?? memory/2026-03-08.md
-?? memory/a2a_heartbeat_cron.log
-?? memory/a2a_heartbeat_monitor.log
-?? memory/a2a_heartbeat_state.json
-?? memory/moltbook_approval_state.json
-?? memory/soul_backup.log
-?? memory/soul_backup_state.json
-?? memory/system_change_log_state.json
-?? plugins/
-?? reports/approval-outbox/approval-request-20260307-121950.md
-?? reports/approval-outbox/approval-request-20260308-000029.md
-?? reports/approval-outbox/approval-request-20260308-162646-20260308-000025-broad-scan.draft.md
-?? reports/cyber-exchange-last-run.log
-?? reports/cyber-exchange/20260306-151428-sandboxing.draft
-?? reports/cyber-exchange/20260306-152647-sandboxing.draft
-?? reports/cyber-exchange/20260306-180504-sandboxing.draft
-?? reports/cyber-exchange/20260306-184959-sandboxing.draft
-?? reports/cyber-exchange/20260307-121934-broad-scan.draft
-?? reports/cyber-exchange/20260307-121937-broad-scan.draft
-?? reports/cyber-exchange/20260307-121940-broad-scan.draft
-?? reports/cyber-exchange/20260307-121943-broad-scan.draft
-?? reports/cyber-exchange/20260307-121945-broad-scan.draft
-?? reports/cyber-exchange/20260307-121948-broad-scan.draft
-?? reports/cyber-exchange/20260308-000003-broad-scan.draft
-?? reports/cyber-exchange/20260308-000007-broad-scan.draft
-?? reports/cyber-exchange/20260308-000012-broad-scan.draft
-?? reports/cyber-exchange/20260308-000016-broad-scan.draft
-?? reports/cyber-exchange/20260308-000019-broad-scan.draft
-?? reports/cyber-exchange/20260308-000025-broad-scan.draft
-?? reports/cyber-exchange/cyber-exchange-20260306-151432.md
-?? reports/cyber-exchange/cyber-exchange-20260306-152653.md
-?? reports/cyber-exchange/cyber-exchange-20260306-180511.md
-?? reports/cyber-exchange/cyber-exchange-20260307-000508.md
-?? reports/cyber-exchange/cyber-exchange-20260307-060509.md
-?? reports/cyber-exchange/cyber-exchange-20260307-120508.md
-?? reports/cyber-exchange/cyber-exchange-20260307-121950.md
-?? reports/cyber-exchange/cyber-exchange-20260308-000029.md
-?? reports/cyber-exchange/http-sandbox-audit.jsonl
-?? reports/cyber-exchange/request-audit.jsonl
-?? reports/global-intel-20260307-091507.md
-?? reports/global-intel-20260307-121956.md
-?? reports/global-intel-20260307-122036.md
-?? reports/global-intel-20260307-122239.md
-?? reports/global-intel-20260307-122429.md
-?? reports/global-intel-20260307-123159.md
-?? reports/global-intel-20260308-000017.md
-?? reports/global-intel-http-audit.jsonl
-?? reports/global-intel-last-run.log
-?? reports/send-logs/telegram-send-20260307-122429.json
-?? reports/send-logs/telegram-send-20260307-123159.json
-?? reports/send-logs/telegram-send-20260307-123805.json
-?? reports/send-logs/telegram-send-20260308-000017.json
-?? scripts/__pycache__/
-?? scripts/soul_backup.cron.sh
-?? scripts/soul_backup.py
-?? scripts/system_change_log.py
-?? scripts/system_change_watchdog.cron.sh
-?? scripts/system_change_watchdog.py
-```
-
-## 本次补充说明
-自动巡检发现代码/配置/技能文件发生变化，已生成并推送最新系统变更日志。

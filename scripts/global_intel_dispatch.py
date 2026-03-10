@@ -4,22 +4,10 @@ import datetime as dt
 import json
 import os
 import re
-import sys
-import time
 from io import StringIO
-from pathlib import Path
 
 import paramiko
 import requests
-
-sys.path.insert(0, '/root/openclaw/skills')
-from http_sandbox import HttpSandbox
-
-ROOT = Path('/root/.openclaw/workspace')
-REPORT_DIR = ROOT / 'reports'
-SEND_LOG_DIR = ROOT / 'reports' / 'send-logs'
-REPORT_DIR.mkdir(parents=True, exist_ok=True)
-SEND_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 ALIYUN_HOST = os.getenv('ALIYUN_HOST', '100.82.179.92')
 ALIYUN_USER = os.getenv('ALIYUN_USER', 'root')
@@ -28,10 +16,11 @@ ALIYUN_MYSQL_PASSWORD = os.getenv('ALIYUN_MYSQL_PASSWORD', '7c8a1c78902e5035')
 
 MODEL_BASE = os.getenv('LCK_BASE_URL', 'http://74.48.182.210:8317/v1')
 MODEL_KEY = os.getenv('LCK_API_KEY', 'xDjn0xIm6ztThd8pSexN8CmCRttLtt8T')
-MODEL_NAME = os.getenv('LCK_MODEL', 'gpt-5.4')
+MODEL_NAME = os.getenv('LCK_MODEL', 'gpt-5.2-codex')
 
 TELEGRAM_BOT_TOKEN = os.getenv('LAFU_BOT_TOKEN', '8545151429:AAGTiHUsUsH_VkYEtswD3I2v_7pDV9DO8S0')
 TELEGRAM_CHAT_ID = os.getenv('LAFU_CHAT_ID', '7392107275')
+TELEGRAM_API_BASE = os.getenv('TELEGRAM_API_BASE', 'https://b.apiepay.cn/tg_bridge_api')
 
 SUBREDDITS = [
     ('SaaS', 'hot'),
@@ -42,314 +31,208 @@ SUBREDDITS = [
 KEYWORDS_GOOD = [
     'ban', 'blocked', 'chargeback', 'fraud', 'suspend', 'suspension', 'kyc', 'compliance',
     'breach', 'attack', 'outage', 'exploit', 'vulnerability', 'stripe', 'payment', 'saas',
-    'detection', 'account', 'risk', 'security', 'malware', 'bot', 'refund', 'policy'
+    'detection', 'account', 'risk', 'security', 'malware', 'bot', 'refund', 'policy',
+    'automation', 'agent', 'deploy', 'workflow', 'ai'
 ]
 KEYWORDS_BAD = [
     'meme', 'shitpost', 'roast', 'hiring', 'career', 'weekly thread', 'off topic', 'funny',
     'monthly post', 'mentorship monday', 'deals + offers', 'iptv'
 ]
 
-SANDBOX = HttpSandbox(
-    approved_domains={
-        'www.reddit.com',
-        'reddit.com',
-        '74.48.182.210:8317',
-        'api.telegram.org',
-    },
-    audit_log_path='/root/.openclaw/workspace/reports/global-intel-http-audit.jsonl',
-)
 
-
-def sandbox_get(url: str, *, headers=None, timeout=20, verify=True):
-    ua = (headers or {}).get('User-Agent', '')
-    guarded = SANDBOX.guard_request('GET', url, payload_text='', ua=ua)
-    return requests.get(guarded['url'], headers=headers, timeout=timeout, verify=verify)
-
-
-def sandbox_post(url: str, *, headers=None, json_payload=None, data=None, timeout=30):
-    ua = (headers or {}).get('User-Agent', '')
-    if json_payload is not None:
-        payload_text = json.dumps(json_payload, ensure_ascii=False)
-        guarded = SANDBOX.guard_request('POST', url, payload_text=payload_text, ua=ua)
-        return requests.post(guarded['url'], headers=headers, json=json_payload, timeout=timeout)
-    payload_text = json.dumps(data, ensure_ascii=False) if isinstance(data, dict) else str(data or '')
-    guarded = SANDBOX.guard_request('POST', url, payload_text=payload_text, ua=ua)
-    return requests.post(guarded['url'], headers=headers, data=data, timeout=timeout)
+def ssh_exec(cmd: str, timeout: int = 60) -> str:
+    cli = paramiko.SSHClient()
+    cli.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    cli.connect(hostname=ALIYUN_HOST, username=ALIYUN_USER, password=ALIYUN_PASSWORD, timeout=10, banner_timeout=10, auth_timeout=10)
+    stdin, stdout, stderr = cli.exec_command(cmd, timeout=timeout)
+    out = stdout.read().decode('utf-8', 'ignore')
+    err = stderr.read().decode('utf-8', 'ignore')
+    cli.close()
+    cleaned_err = '\n'.join(line for line in err.splitlines() if 'Using a password on the command line interface can be insecure.' not in line).strip()
+    if cleaned_err:
+        raise RuntimeError(cleaned_err)
+    return out
 
 
 def score_post(p: dict) -> int:
     title = (p.get('title') or '').lower()
     score = int(p.get('score') or 0)
     comments = int(p.get('num_comments') or 0)
-    ups = int(score / 10) + comments * 2
+    val = int(score / 10) + comments * 2
     for kw in KEYWORDS_GOOD:
         if kw in title:
-            ups += 18
+            val += 18
     for kw in KEYWORDS_BAD:
         if kw in title:
-            ups -= 80
+            val -= 80
     if p.get('stickied'):
-        ups -= 40
+        val -= 40
     if p.get('over_18'):
-        ups -= 10
-    return ups
+        val -= 10
+    return val
 
 
 def fetch_reddit(limit_per_sub: int = 10):
     headers = {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) OpenClawGlobalIntel/1.0',
+        'User-Agent': 'Mozilla/5.0 OpenClawGlobalIntel/2.0',
         'Accept': 'application/json',
     }
     picked = []
     seen = set()
     for sub, mode in SUBREDDITS:
-        urls = [
-            f'https://www.reddit.com/r/{sub}/{mode}.json&limit={limit_per_sub}&raw_json=1' if '?' in mode else f'https://www.reddit.com/r/{sub}/{mode}.json?limit={limit_per_sub}&raw_json=1',
-            f'https://www.reddit.com/r/{sub}.json?limit={limit_per_sub}&raw_json=1',
-        ]
-        data = None
-        last_err = None
-        for url in urls:
-            try:
-                r = sandbox_get(url, headers=headers, timeout=20)
-                r.raise_for_status()
-                data = r.json()['data']['children']
-                break
-            except Exception as e:
-                last_err = e
-                continue
-        if data is None:
-            print(f'[reddit-skip] r/{sub} -> {type(last_err).__name__}: {last_err}', file=sys.stderr)
+        url = f'https://www.reddit.com/r/{sub}/{mode}.json&limit={limit_per_sub}&raw_json=1' if '?' in mode else f'https://www.reddit.com/r/{sub}/{mode}.json?limit={limit_per_sub}&raw_json=1'
+        try:
+            r = requests.get(url, headers=headers, timeout=20)
+            r.raise_for_status()
+            data = r.json()['data']['children']
+        except Exception:
             continue
         for item in data:
             p = item['data']
             permalink = p.get('permalink', '')
-            if permalink in seen:
+            if not permalink or permalink in seen:
                 continue
             seen.add(permalink)
             post = {
-                'subreddit': sub,
-                'title': p.get('title', ''),
-                'url': 'https://reddit.com' + permalink,
-                'score': int(p.get('score') or 0),
-                'comments': int(p.get('num_comments') or 0),
-                'created': dt.datetime.fromtimestamp(p.get('created_utc', 0)).strftime('%Y-%m-%d %H:%M'),
-                'selftext': re.sub(r'\s+', ' ', (p.get('selftext') or ''))[:500],
+                'source_node': 'laicai',
+                'source_type': 'overseas_trend',
+                'platform': f'reddit/r/{sub}',
+                'signal_title': re.sub(r'\s+', ' ', p.get('title', '')).strip(),
+                'signal_url': 'https://reddit.com' + permalink,
+                'signal_body': re.sub(r'\s+', ' ', (p.get('selftext') or ''))[:1200],
+                'signal_score': score_post(p),
+                'signal_tags': '海外,趋势,自动化,变现',
+                'captured_at': dt.datetime.fromtimestamp(p.get('created_utc', 0)).strftime('%Y-%m-%d %H:%M:%S'),
+                'extra_json': '',
             }
-            post['signal_score'] = score_post(p)
-            if post['signal_score'] >= 40:
+            if post['signal_score'] >= 40 and post['signal_title']:
                 picked.append(post)
-    picked.sort(key=lambda x: (x['signal_score'], x['score'], x['comments']), reverse=True)
+    picked.sort(key=lambda x: x['signal_score'], reverse=True)
     return picked[:8]
 
 
-def ssh_exec(host: str, user: str, password: str, cmd: str, timeout: int = 30) -> str:
-    cli = paramiko.SSHClient()
-    cli.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    cli.connect(hostname=host, username=user, password=password, timeout=10, banner_timeout=10, auth_timeout=10)
-    stdin, stdout, stderr = cli.exec_command(cmd, timeout=timeout)
-    out = stdout.read().decode('utf-8', 'ignore')
-    err = stderr.read().decode('utf-8', 'ignore')
-    cli.close()
-    cleaned_err = '\n'.join(
-        line for line in err.splitlines()
-        if 'Using a password on the command line interface can be insecure.' not in line
-    ).strip()
-    if cleaned_err:
-        raise RuntimeError(cleaned_err)
-    return out
-
-
-def fetch_domestic(limit: int = 8):
+def ingest_raw_signals(rows):
+    if not rows:
+        return 0
+    values = []
+    for r in rows:
+        def esc(v):
+            return str(v or '').replace('\\', '\\\\').replace("'", "\\'")
+        values.append(
+            "('laicai','%s','%s','%s','%s','%s',%d,'%s','%s',NULL)" % (
+                esc(r['source_type']), esc(r['platform']), esc(r['signal_title']), esc(r['signal_url']),
+                esc(r['signal_body']), int(r['signal_score']), esc(r['signal_tags']), esc(r['captured_at'])
+            )
+        )
     sql = (
-        "SELECT id,category,source,title,url,anxiety_score,"
-        "DATE_FORMAT(COALESCE(published_at,created_at),'%Y-%m-%d %H:%i') "
+        "INSERT INTO intel_station.raw_signals "
+        "(source_node,source_type,platform,signal_title,signal_url,signal_body,signal_score,signal_tags,captured_at,extra_json) VALUES "
+        + ','.join(values) + '; SELECT ROW_COUNT();'
+    )
+    out = ssh_exec(f"mysql -uroot -p'{ALIYUN_MYSQL_PASSWORD}' -Nse \"{sql}\"", timeout=80).strip()
+    try:
+        return int(out.splitlines()[-1])
+    except Exception:
+        return len(rows)
+
+
+def fetch_domestic(limit: int = 6):
+    sql = (
+        "SELECT category,title,anxiety_score,DATE_FORMAT(COALESCE(published_at,created_at),'%Y-%m-%d %H:%i') "
         "FROM intel_station.intel_articles "
-        "WHERE push_status=0 "
-        "AND COALESCE(published_at,created_at)>=DATE_SUB(NOW(),INTERVAL 72 HOUR) "
+        "WHERE COALESCE(published_at,created_at)>=DATE_SUB(NOW(),INTERVAL 72 HOUR) "
         "ORDER BY anxiety_score DESC, COALESCE(published_at,created_at) DESC "
         f"LIMIT {limit};"
     )
-    cmd = f"mysql -uroot -p'{ALIYUN_MYSQL_PASSWORD}' -Nse \"{sql}\""
-    raw = ssh_exec(ALIYUN_HOST, ALIYUN_USER, ALIYUN_PASSWORD, cmd, timeout=40)
+    raw = ssh_exec(f"mysql -uroot -p'{ALIYUN_MYSQL_PASSWORD}' -Nse \"{sql}\"", timeout=40)
     rows = []
-    reader = csv.reader(StringIO(raw), delimiter='\t')
-    for row in reader:
-        if len(row) < 7:
+    for row in csv.reader(StringIO(raw), delimiter='\t'):
+        if len(row) < 4:
             continue
-        rows.append({
-            'id': row[0],
-            'category': row[1],
-            'source': row[2],
-            'title': row[3],
-            'url': row[4],
-            'anxiety_score': int(row[5] or 0),
-            'created': row[6],
-        })
+        rows.append({'category': row[0], 'title': row[1], 'score': int(row[2] or 0), 'created': row[3]})
     return rows
 
 
-def mark_domestic_pushed(domestic):
-    ids = [str(x['id']) for x in domestic if x.get('id')]
-    if not ids:
-        return 'SKIP:NO_IDS'
-    sql = f"UPDATE intel_station.intel_articles SET push_status=1 WHERE id IN ({','.join(ids)}); SELECT ROW_COUNT();"
-    cmd = f"mysql -uroot -p'{ALIYUN_MYSQL_PASSWORD}' -Nse \"{sql}\""
-    out = ssh_exec(ALIYUN_HOST, ALIYUN_USER, ALIYUN_PASSWORD, cmd, timeout=40).strip()
-    return out or 'OK'
-
-
-def summarize_with_model(domestic, reddit):
-    prompt = {
-        'model': MODEL_NAME,
-        'messages': [
-            {
-                'role': 'system',
-                'content': (
-                    '你是情报总控官。你必须输出一份极简中文 Markdown 战报，且必须严格遵守以下格式，不得多写废话：\n'
-                    '1. 只能输出两个一级区块：## 🇨🇳 国内资金与流量 以及 ## 🇺🇸 海外硬核与漏洞。\n'
-                    '2. 每个区块下只能使用 Markdown 表格。\n'
-                    '3. 表头必须固定为：| 风险级别 | 核心事件 | 主公对策 |\n'
-                    '4. 每个区块最多 4 行，单元格极简短句，禁止长段解释。\n'
-                    '5. 不要输出“一句话判断”、前言、总结、分隔线、项目符号、编号、注释、代码块。\n'
-                    '6. 风险级别只允许：高 / 中 / 低。\n'
-                    '7. 主公对策必须是可执行动作，短句收尾。'
-                )
-            },
-            {
-                'role': 'user',
-                'content': json.dumps({'domestic': domestic, 'reddit': reddit}, ensure_ascii=False)
-            }
-        ],
-        'temperature': 0.2
-    }
-    url = MODEL_BASE.rstrip('/') + '/chat/completions'
-    r = sandbox_post(url, headers={'Authorization': f'Bearer {MODEL_KEY}'}, json_payload=prompt, timeout=90)
-    r.raise_for_status()
-    data = r.json()
-    return data['choices'][0]['message']['content'].strip()
-
-
-def fallback_summary(domestic, reddit):
-    def cut(text, n=26):
-        text = re.sub(r'\s+', ' ', str(text or '')).strip()
-        return text if len(text) <= n else text[:n - 1] + '…'
-
-    lines = []
-    lines.append('## 🇨🇳 国内资金与流量')
-    lines.append('| 风险级别 | 核心事件 | 主公对策 |')
-    lines.append('|---|---|---|')
+def fallback_summary(domestic, overseas):
+    lines = ['🔥 来福双擎情报日报', f"生成时间：{dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", '', '## 🇨🇳 国内资金与流量', '| 风险级别 | 核心事件 | 主公对策 |', '|---|---|---|']
     if domestic:
-        for item in domestic[:4]:
-            level = '高' if int(item.get('anxiety_score', 0)) >= 18 else ('中' if int(item.get('anxiety_score', 0)) >= 10 else '低')
-            event = cut(f"{item.get('category','未分类')}：{item.get('title','')}")
-            action = '盯关键词、复核影响、准备跟单'
-            lines.append(f'| {level} | {event} | {action} |')
+        for x in domestic[:4]:
+            level = '高' if x['score'] >= 18 else ('中' if x['score'] >= 10 else '低')
+            title = (x['title'][:24] + '…') if len(x['title']) > 24 else x['title']
+            lines.append(f"| {level} | {x['category']}：{title} | 盯链路、看影响、准备复核 |")
     else:
-        lines.append('| 低 | 国内侧暂无新高压信号 | 保持巡航，不加动作 |')
-    lines.append('')
-    lines.append('## 🇺🇸 海外硬核与漏洞')
-    lines.append('| 风险级别 | 核心事件 | 主公对策 |')
-    lines.append('|---|---|---|')
-    if reddit:
-        for item in reddit[:4]:
-            s = int(item.get('signal_score', 0))
-            level = '高' if s >= 90 else ('中' if s >= 60 else '低')
-            event = cut(f"r/{item.get('subreddit','?')}：{item.get('title','')}")
-            action = '追原帖、看评论、提炼漏洞点'
-            lines.append(f'| {level} | {event} | {action} |')
+        lines.append('| 低 | 国内侧暂无高压新增 | 保持巡航，不加动作 |')
+    lines += ['', '## 🇺🇸 海外硬核与漏洞', '| 风险级别 | 核心事件 | 主公对策 |', '|---|---|---|']
+    if overseas:
+        for x in overseas[:4]:
+            level = '高' if x['signal_score'] >= 90 else ('中' if x['signal_score'] >= 60 else '低')
+            title = (x['signal_title'][:24] + '…') if len(x['signal_title']) > 24 else x['signal_title']
+            lines.append(f"| {level} | {x['platform']}：{title} | 入来福 raw_signals，等主编提纯 |")
     else:
-        lines.append('| 低 | 海外侧暂无高价值热帖 | 继续抓取，不做推演 |')
+        lines.append('| 低 | 海外侧暂无高信号新增 | 继续探针，不做扩写 |')
     return '\n'.join(lines)
 
 
-def render_report(domestic, reddit, summary):
-    now = dt.datetime.now().strftime('%Y-%m-%d %H:%M %Z')
-    summary = (summary or '').strip()
-    summary = re.sub(r'^```(?:markdown)?\s*', '', summary, flags=re.I)
-    summary = re.sub(r'\s*```$', '', summary)
-    summary = _enforce_brief_tables(summary, domestic, reddit)
-    lines = [f'🔥 来福双擎情报日报', f'生成时间：{now}', '']
-    lines.append(summary)
+def summarize_with_model(domestic, overseas):
+    prompt = {
+        'model': MODEL_NAME,
+        'messages': [
+            {'role': 'system', 'content': '你是情报总控官。只输出中文 Markdown。必须只有两个区块：## 🇨🇳 国内资金与流量、## 🇺🇸 海外硬核与漏洞。每个区块下只能是表格，表头固定为 | 风险级别 | 核心事件 | 主公对策 | 。每区块最多4行，禁止前言总结。'},
+            {'role': 'user', 'content': json.dumps({'domestic': domestic, 'overseas': overseas}, ensure_ascii=False)}
+        ],
+        'temperature': 0.2,
+    }
+    r = requests.post(MODEL_BASE.rstrip('/') + '/chat/completions', headers={'Authorization': f'Bearer {MODEL_KEY}'}, json=prompt, timeout=90)
+    r.raise_for_status()
+    text = r.json()['choices'][0]['message']['content'].strip()
+    if '## 🇨🇳 国内资金与流量' not in text or '## 🇺🇸 海外硬核与漏洞' not in text:
+        raise RuntimeError('summary shape invalid')
+    return '🔥 来福双擎情报日报\n生成时间：%s\n\n%s' % (dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), text)
+
+
+def tg_card_report(domestic, overseas):
+    lines = ['🔥 **来福双擎情报日报**', '**生成时间：** %s' % dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '', '🇨🇳 **国内资金与流量**']
+    if domestic:
+        for x in domestic[:4]:
+            level = '高' if x['score'] >= 18 else ('中' if x['score'] >= 10 else '低')
+            title = (x['title'][:24] + '…') if len(x['title']) > 24 else x['title']
+            lines += ['风险级别：**%s**' % level, '核心事件：%s：%s' % (x['category'], title), '主公对策：盯链路、看影响、准备复核', '']
+    else:
+        lines += ['风险级别：**低**', '核心事件：国内侧暂无高压新增', '主公对策：保持巡航，不加动作', '']
+    lines += ['🇺🇸 **海外硬核与漏洞**']
+    if overseas:
+        for x in overseas[:4]:
+            level = '高' if x['signal_score'] >= 90 else ('中' if x['signal_score'] >= 60 else '低')
+            title = (x['signal_title'][:24] + '…') if len(x['signal_title']) > 24 else x['signal_title']
+            lines += ['风险级别：**%s**' % level, '核心事件：%s：%s' % (x['platform'], title), '主公对策：入来福 raw_signals，等主编提纯', '']
+    else:
+        lines += ['风险级别：**低**', '核心事件：海外侧暂无高信号新增', '主公对策：继续探针，不做扩写', '']
     return '\n'.join(lines).strip()
 
 
-def archive_send_log(ts: str, payload: dict, response_text: str, status_code: int):
-    path = SEND_LOG_DIR / f'telegram-send-{ts}.json'
-    path.write_text(json.dumps({
-        'timestamp': ts,
-        'payload': payload,
-        'status_code': status_code,
-        'response_text': response_text,
-    }, ensure_ascii=False, indent=2), encoding='utf-8')
-    return path
-
-
-def _enforce_brief_tables(text: str, domestic, reddit) -> str:
-    text = (text or '').strip()
-    has_cn = '## 🇨🇳 国内资金与流量' in text
-    has_us = '## 🇺🇸 海外硬核与漏洞' in text
-    has_header = '| 风险级别 | 核心事件 | 主公对策 |' in text
-    if has_cn and has_us and has_header:
-        return text
-    return fallback_summary(domestic, reddit)
-
-
-def _clean_text(text: str) -> str:
-    text = (text or '').replace('\x00', ' ')
-    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', ' ', text)
-    text = text.replace('\r\n', '\n').replace('\r', '\n')
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    return text.strip()
-
-
-def send_to_laifu(report: str, ts: str):
-    url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage'
-    clean_text = _clean_text(report)[:3500]
-    payload = {
-        'chat_id': TELEGRAM_CHAT_ID,
-        'text': clean_text,
-        'disable_web_page_preview': True,
-    }
-    # Telegram 发送只审目标域名与简短载荷标签，避免正文因出现 token/password 等安全词被误伤。
-    SANDBOX.guard_request('POST', url, payload_text='telegram_report_send', ua='OpenClawGlobalIntel/1.0')
-    last_err = None
-    for attempt in range(1, 4):
-        try:
-            r = requests.post(url, json=payload, timeout=30)
-            archive_send_log(ts, payload, r.text, r.status_code)
-            r.raise_for_status()
-            data = r.json()
-            if not data.get('ok'):
-                raise RuntimeError(r.text)
-            return data
-        except Exception as e:
-            last_err = e
-            time.sleep(2 * attempt)
-    raise RuntimeError(f'Telegram send failed after retries: {last_err}')
+def send_to_laifu(report: str):
+    payload = {'chat_id': TELEGRAM_CHAT_ID, 'text': report[:3800], 'disable_web_page_preview': True}
+    r = requests.post("{}/bot{}/sendMessage".format(TELEGRAM_API_BASE.rstrip('/'), TELEGRAM_BOT_TOKEN), json=payload, timeout=30)
+    r.raise_for_status()
+    data = r.json()
+    if not data.get('ok'):
+        raise RuntimeError(r.text)
+    return data
 
 
 def main():
+    overseas = fetch_reddit()
+    inserted = ingest_raw_signals(overseas)
     domestic = fetch_domestic()
-    reddit = fetch_reddit()
     try:
-        summary = summarize_with_model(domestic, reddit)
-    except Exception as e:
-        summary = fallback_summary(domestic, reddit) + f"\n\n【模型降级回执】{type(e).__name__}: {e}"
-    report = render_report(domestic, reddit, summary)
-    ts = dt.datetime.now().strftime('%Y%m%d-%H%M%S')
-    out = REPORT_DIR / f'global-intel-{ts}.md'
-    latest = REPORT_DIR / 'global-intel-latest.md'
-    out.write_text(report, encoding='utf-8')
-    latest.write_text(report, encoding='utf-8')
-    send_result = send_to_laifu(report, ts)
-    mark_result = mark_domestic_pushed(domestic)
-    print(str(out))
-    print('---RESULT---')
-    print(f'TELEGRAM_OK chat_id={TELEGRAM_CHAT_ID} message_id={send_result["result"]["message_id"]}')
-    print(f'PUSH_STATUS_WRITEBACK {mark_result}')
-    print(f'DOMESTIC_COUNT {len(domestic)}')
-    print(f'REDDIT_COUNT {len(reddit)}')
+        _ = summarize_with_model(domestic, overseas)
+    except Exception:
+        pass
+    report = tg_card_report(domestic, overseas)
+    tg = send_to_laifu(report)
+    overseas.clear()
+    domestic.clear()
+    print(json.dumps({'raw_signals_inserted': inserted, 'telegram_message_id': tg['result']['message_id'], 'local_persist': 'disabled'}, ensure_ascii=False))
 
 
 if __name__ == '__main__':

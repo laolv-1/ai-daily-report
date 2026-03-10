@@ -1,0 +1,8 @@
+CRON_TZ=Asia/Shanghai
+*/5 * * * * /usr/bin/python3 /root/.openclaw/workspace/scripts/a2a_heartbeat_monitor.py >> /root/.openclaw/workspace/memory/a2a_heartbeat_cron.log 2>&1
+0 0,12 * * * /root/.openclaw/workspace/scripts/cyber_exchange_audit.cron.sh
+0 0,12 * * * /root/.openclaw/workspace/scripts/pull_and_push_intel.cron.sh
+15 */6 * * * /root/.openclaw/workspace/scripts/context_refresh_guard.cron.sh
+40 23 * * * /root/.openclaw/workspace/scripts/soul_backup.cron.sh
+*/10 * * * * /root/.openclaw/workspace/scripts/system_change_watchdog.cron.sh
+30 12 * * * /root/.openclaw/workspace/scripts/market_research_daily.cron.sh

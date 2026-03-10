@@ -12,7 +12,7 @@ import requests
 ALIYUN_MYSQL_PASSWORD = os.getenv('ALIYUN_MYSQL_PASSWORD', '7c8a1c78902e5035')
 MODEL_BASE = os.getenv('LCK_BASE_URL', 'http://74.48.182.210:8317/v1')
 MODEL_KEY = os.getenv('LCK_API_KEY', 'xDjn0xIm6ztThd8pSexN8CmCRttLtt8T')
-MODEL_NAME = os.getenv('LCK_MODEL', 'gpt-5.4')
+MODEL_NAME = os.getenv('LCK_MODEL', 'gpt-5.2-codex')
 BOT_TOKEN = os.getenv('LAFU_BOT_TOKEN', '8545151429:AAGTiHUsUsH_VkYEtswD3I2v_7pDV9DO8S0')
 CHAT_ID = os.getenv('LAFU_CHAT_ID', '7392107275')
 TELEGRAM_API_BASE = os.getenv('TELEGRAM_API_BASE', 'https://b.apiepay.cn/tg_bridge_api')

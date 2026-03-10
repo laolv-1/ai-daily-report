@@ -1,0 +1,3 @@
+total 5752
+-rw-r--r-- 1 root root 1027656 Mar 11 02:08 openclaw-2026-03-10.log
+-rw-r--r-- 1 root root 4846833 Mar 10 22:01 openclaw-2026-03-09.log
