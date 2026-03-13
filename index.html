@@ -117,6 +117,7 @@ function switchTab(tab,el){
         document.querySelector('.tag-wall-container').style.display='none';
         document.querySelector('.search-container').style.display='none';
         document.querySelector('.container #grid').parentElement.style.display='none';
+        if (typeof mermaid !== 'undefined') { mermaid.init(undefined, document.querySelectorAll('.mermaid')); }
         return;
     }else{
         document.getElementById('archContainer').style.display='none';
@@ -129,6 +130,7 @@ function switchTab(tab,el){
     document.querySelector('.filter-tag').classList.add('active');
     updateTags(data);
     filterData();
+    filterCards(curTab);
 }
 function setTag(tag,el){
     document.querySelectorAll('.filter-tag').forEach(e=>e.classList.remove('active'));
@@ -144,12 +146,25 @@ function filterData(){
         return mt&&mg&&ms;
     });
     render(f);
+    filterCards(curTab);
+}
+
+function filterCards(category){
+    const cards = document.querySelectorAll('.intel-card');
+    cards.forEach(card => {
+        const c = card.getAttribute('data-category');
+        if (category === 'ALL' || c === category) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
 }
 function render(items){
     const g=document.getElementById('grid'),l=document.getElementById('loader');
     if(!l.parentNode){g.innerHTML='';g.appendChild(l);}
     if(items.length===0){g.innerHTML='<div style="color:#666;text-align:center;grid-column:1/-1;padding:40px;">NO DATA</div>';return;}
-    g.innerHTML=items.map((i,idx)=>`<div class="glass-card" onclick="openModal(${data.indexOf(i)})"><div>${(i.tags||[]).map(t=>'<span class="tag">'+t+'</span>').join('')}</div><div class="card-title">${i.title}</div><div class="card-short">${i.short_comment||''}</div></div>`).join('');
+    g.innerHTML=items.map((i,idx)=>`<div class="glass-card intel-card" data-category="${i.tab_category||'ALL'}" onclick="openModal(${data.indexOf(i)})"><div>${(i.tags||[]).map(t=>'<span class="tag">'+t+'</span>').join('')}</div><div class="card-title">${i.title}</div><div class="card-short">${i.short_comment||''}</div></div>`).join('');
 }
 function openModal(idx){
     const i=data[idx];if(!i)return;
