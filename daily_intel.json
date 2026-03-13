@@ -1,7 +1,43 @@
 {
-  "generated_at": "2026-03-14 01:39:54 GMT+8",
-  "source": "来福狂暴引擎 v4.0 (死循环驻留)",
+  "generated_at": "2026-03-14 01:39:59 GMT+8",
+  "source": "来福双轨引擎 v5.0 (情报 + 藏经阁 + 练兵场)",
   "intel": [
+    {
+      "title": "💸 [割韭菜预警] 小红书『AI 绘图月入十万』教程大起底",
+      "source_url": "https://www.xiaohongshu.com/search/ai-huihua",
+      "tags": [
+        "搞钱",
+        "智商税",
+        "小红书"
+      ],
+      "tab_category": "情报",
+      "short_comment": "虾小侠锐评：拿 Midjourney 免费次抛号套壳，教你赚钱的人赚的就是你买课的钱！",
+      "full_markdown": "## 骗局拆解\n\n### 1. 套路流程\n1. 用 AI 生成精美图片，配文\"在家躺赚月入十万\"\n2. 引流到私域，售卖 299-999 元\"教程\"\n3. 教程内容：网上免费的 Midjourney 注册教程 + 几个 Prompt 模板\n\n### 2. 真实收益\n- 卖课收入：头部玩家月入 10-50 万\n- 学员收入：99% 的人连本钱都赚不回来\n\n### 3. 防坑指南\n- 凡是承诺\"躺赚\"的都是镰刀\n- 凡是先交学费的都是骗局\n- 真正赚钱的方法没人会到处说\n\n### 4. 正确姿势\n想学 AI 绘图？直接：\n1. 注册 Midjourney 官方 ($10/月)\n2. 看官方文档和 Discord 社区\n3. 自己接单练手，别买课！\n"
+    },
+    {
+      "title": "🛡️ [漏洞预警] 某厂云端 API 鉴权绕过 0day",
+      "source_url": "https://hackerone.com/reports/2026-03",
+      "tags": [
+        "漏洞",
+        "安全",
+        "0day"
+      ],
+      "tab_category": "情报",
+      "short_comment": "虾小侠锐评：号称军工级加密，结果 JWT 密钥硬编码在前端 JS 里！",
+      "full_markdown": "## 漏洞详情\n\n### CVE-2026-1847\n- **影响范围**: 某头部云服务商 API 网关\n- **严重程度**: Critical (CVSS 9.8)\n- **利用方式**: 前端 JS 硬编码 JWT 密钥\n\n### 技术细节\n攻击者只需：\n1. 打开浏览器开发者工具\n2. 查看前端 JS 源码\n3. 搜索 `secret` 或 `key` 关键字\n4. 找到硬编码的密钥：`const JWT_SECRET = \"super_secret_key_123\"`\n5. 自行签发任意 Token\n\n### 修复建议\n- 密钥必须存放在服务端环境变量\n- 前端永远不要信任任何敏感信息\n- 启用密钥轮换机制\n\n### 时间线\n- 2026-03-10: 白帽子提交报告\n- 2026-03-12: 厂商确认漏洞\n- 2026-03-14: 公开披露\n"
+    },
+    {
+      "title": "📱 [TikTok 搞钱] 无人直播带货新玩法",
+      "source_url": "https://www.tiktok.com/business/",
+      "tags": [
+        "搞钱",
+        "TikTok",
+        "直播"
+      ],
+      "tab_category": "情报",
+      "short_comment": "虾小侠锐评：用 AI 生成虚拟主播 24 小时直播，这才是真·躺赚！",
+      "full_markdown": "## 无人直播玩法\n\n### 核心思路\n1. 用 AI 生成虚拟主播 (D-ID/Synthesia)\n2. 录制产品介绍视频循环播放\n3. 挂载小黄车，自动成交\n\n### 成本核算\n- AI 主播生成：$30/月 (D-ID)\n- TikTok 小店保证金：$500\n- 预期收益：头部玩家日销$1000+\n\n### 操作步骤\n1. 注册 TikTok Shop (需要海外主体)\n2. 选品：1688 一件代发\n3. 用 AI 生成 100 条产品视频\n4. 设置循环直播，24 小时不间断\n\n### 风险提示\n- TikTok 可能封禁无人直播账号\n- 需要准备多个账号矩阵\n- 选品要避免侵权\n"
+    },
     {
       "title": "🐳 [服务器基建] Docker 容器一键部署与防坑指南",
       "source_url": "https://docs.docker.com/get-started/",
@@ -10,8 +46,9 @@
         "Docker",
         "服务器"
       ],
-      "short_comment": "虾小侠锐评：别再问为什么端口映射不出来了，0.0.0.0 和 127.0.0.1 都分不清的韭菜先看这篇。拒接扯淡，全是干货。",
-      "full_markdown": "\n【Linux 极简命令防坑指南 - 完整版】\n\n## 一、文件操作核心命令\n\n### 1.1 查找文件\n```bash\n# 按名称查找\nfind /root -name \"*.conf\"\n\n# 按大小查找 (>100M)\nfind /var -size +100M\n\n# 按时间查找 (7 天内修改)\nfind /home -mtime -7\n```\n\n### 1.2 权限管理\n```bash\n# 递归修改所有者\nchown -R www-data:www-data /var/www/html\n\n# 安全权限设置\nchmod 644 /etc/nginx/nginx.conf\nchmod 755 /usr/local/bin/myscript.sh\n\n# 绝对禁止 chmod 777！除非你想让黑客随便进出\n```\n\n### 1.3 进程管理\n```bash\n# 查看占用 CPU 最高的进程\ntop -b -n 1 | head -20\n\n# 查找并杀死进程\nps aux | grep python\nkill -9 <PID>\n\n# 后台运行并记录日志\nnohup python3 app.py > app.log 2>&1 &\n```\n\n## 二、Docker 一键部署\n\n### 2.1 安装 (阿里云镜像加速)\n```bash\ncurl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun\nsystemctl enable docker && systemctl start docker\n```\n\n### 2.2 核心参数详解\n- `-d`: 后台运行 (detach)\n- `-p 8080:80`: 端口映射 (宿主机：容器)\n- `-v /host:/container`: 数据卷挂载\n- `--restart=always`: 开机自启\n- `--network host`: 使用宿主机网络\n\n### 2.3 实战：部署 Nginx\n```bash\ndocker run -d   --name nginx_web   -p 80:80   -v /my/html:/usr/share/nginx/html:ro   --restart=always   nginx:alpine\n```\n\n### 2.4 常用排障\n```bash\n# 查看容器日志\ndocker logs -f nginx_web\n\n# 进入容器调试\ndocker exec -it nginx_web /bin/sh\n\n# 清理无用资源\ndocker system prune -a --volumes\n```\n\n## 三、PM2 进程管理\n\n### 3.1 安装与启动\n```bash\nnpm install -g pm2\npm2 start app.py --name myapp\npm2 startup\npm2 save\n```\n\n### 3.2 常用命令\n```bash\npm2 list          # 查看所有进程\npm2 logs myapp    # 查看日志\npm2 restart myapp # 重启\npm2 stop myapp    # 停止\npm2 delete myapp  # 删除\n```\n"
+      "tab_category": "藏经阁",
+      "short_comment": "虾小侠锐评：别再问为什么端口映射不出来了，0.0.0.0 和 127.0.0.1 都分不清的韭菜先看这篇！",
+      "full_markdown": "## 一、Docker 安装\n\n### 阿里云镜像加速\n```bash\ncurl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun\nsystemctl enable docker && systemctl start docker\n```\n\n### 验证安装\n```bash\ndocker --version\ndocker run hello-world\n```\n\n## 二、核心参数详解\n\n| 参数 | 说明 | 示例 |\n|------|------|------|\n| `-d` | 后台运行 | `docker run -d nginx` |\n| `-p` | 端口映射 | `-p 8080:80` (宿主机：容器) |\n| `-v` | 数据卷挂载 | `-v /host:/container` |\n| `--restart` | 重启策略 | `--restart=always` |\n| `--network` | 网络模式 | `--network host` |\n\n## 三、实战：部署 Nginx\n\n```bash\n# 创建网页目录\nmkdir -p /my/html\necho \"<h1>Hello Docker!</h1>\" > /my/html/index.html\n\n# 启动容器\ndocker run -d \\\n  --name nginx_web \\\n  -p 80:80 \\\n  -v /my/html:/usr/share/nginx/html:ro \\\n  --restart=always \\\n  nginx:alpine\n```\n\n## 四、常用排障\n\n```bash\n# 查看日志\ndocker logs -f nginx_web\n\n# 进入容器\ndocker exec -it nginx_web /bin/sh\n\n# 清理资源\ndocker system prune -a --volumes\n```\n"
     },
     {
       "title": "🐙 [代码武器库] Git/GitHub 从入门到精通",
@@ -21,8 +58,9 @@
         "GitHub",
         "代码武器库"
       ],
-      "short_comment": "虾小侠锐评：连 git pull 和 git push 都搞反的选手，这篇就是你的救命稻草。从克隆到 Actions 自动化，一条龙喂到嘴边。",
-      "full_markdown": "\n【Git/GitHub 基础操作 - 从入门到精通】\n\n## 一、核心工作流\n\n### 1.1 克隆与同步\n```bash\n# 克隆仓库\ngit clone https://github.com/user/repo.git\n\n# 拉取最新代码\ngit pull origin main\n\n# 推送代码\ngit push origin main\n```\n\n### 1.2 分支管理\n```bash\n# 创建并切换分支\ngit checkout -b feature/new-feature\n\n# 查看分支\ngit branch -a\n\n# 合并分支\ngit checkout main\ngit merge feature/new-feature\n```\n\n### 1.3 提交规范\n```bash\n# 添加文件\ngit add .\n\n# 提交 (遵循 Conventional Commits)\ngit commit -m \"feat: add user authentication\"\ngit commit -m \"fix: resolve login bug\"\ngit commit -m \"docs: update README\"\n```\n\n## 二、GitHub Actions 自动化\n\n### 2.1 创建工作流\n`.github/workflows/deploy.yml`:\n```yaml\nname: Deploy\n\non:\n  push:\n    branches: [main]\n  workflow_dispatch:\n\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      \n      - name: Setup Node.js\n        uses: actions/setup-node@v4\n        with:\n          node-version: '20'\n      \n      - name: Install & Build\n        run: |\n          npm install\n          npm run build\n      \n      - name: Deploy\n        run: echo \"Deploying...\"\n```\n\n### 2.2 配置 Secrets\n1. 仓库 → Settings → Secrets and variables → Actions\n2. New repository secret\n3. 填入 API_KEY 等敏感信息\n4. 在工作流中通过 ${{ secrets.API_KEY }} 引用\n\n## 三、常见问题排障\n\n### 3.1 冲突解决\n```bash\n# 拉取时遇到冲突\ngit pull origin main\n\n# 编辑冲突文件，解决 <<< === >>> 标记\n\n# 标记为解决\ngit add conflicted_file.py\ngit commit -m \"resolve merge conflict\"\n```\n\n### 3.2 撤销操作\n```bash\n# 撤销工作区修改\ngit checkout -- file.py\n\n# 撤销暂存\ngit reset HEAD file.py\n\n# 撤销提交 (保留修改)\ngit reset --soft HEAD~1\n\n# 强制推送到远程 (慎用!)\ngit push --force\n```\n"
+      "tab_category": "藏经阁",
+      "short_comment": "虾小侠锐评：连 git pull 和 git push 都搞反的选手，这篇就是你的救命稻草！",
+      "full_markdown": "## 一、核心工作流\n\n### 克隆仓库\n```bash\ngit clone https://github.com/user/repo.git\ncd repo\n```\n\n### 提交代码\n```bash\ngit add .\ngit commit -m \"feat: add new feature\"\ngit push origin main\n```\n\n### 同步远程\n```bash\ngit pull origin main\n```\n\n## 二、分支管理\n\n```bash\n# 创建并切换分支\ngit checkout -b feature/new-feature\n\n# 查看分支\ngit branch -a\n\n# 合并分支\ngit checkout main\ngit merge feature/new-feature\n\n# 删除分支\ngit branch -d feature/new-feature\n```\n\n## 三、GitHub Actions 自动化\n\n### 创建工作流\n`.github/workflows/deploy.yml`:\n```yaml\nname: Deploy\non:\n  push:\n    branches: [main]\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: echo \"Deploying...\"\n```\n\n### 配置 Secrets\n1. 仓库 → Settings → Secrets and variables → Actions\n2. New repository secret\n3. 填入 API_KEY 等敏感信息\n"
     },
     {
       "title": "🤖 [AI 编程驾驭] Cursor + Cline 顶级实战指南",
@@ -32,8 +70,33 @@
         "Cursor",
         "代码武器库"
       ],
-      "short_comment": "虾小侠锐评：还在手动写 CRUD？让 AI 代理帮你干活！这篇教你如何用 Prompt 注入把 Cline 调教成顶级架构师。",
-      "full_markdown": "\n【Cursor / Cline AI 编程驾驭 - 顶级实战指南】\n\n## 一、环境配置\n\n### 1.1 安装 Cursor\n1. 访问 https://cursor.sh 下载\n2. 安装后导入 VSCode 插件\n3. 登录账号 (推荐付费版，额度更高)\n\n### 1.2 安装 Cline 插件\n1. 打开 Cursor 插件市场\n2. 搜索 \"Cline\" 或 \"Claude Dev\"\n3. 点击 Install\n\n### 1.3 API 配置\n进入 Cline Settings:\n- Provider: OpenAI Compatible\n- Base URL: https://api.yourproxy.com/v1\n- API Key: sk-xxxxx\n- Model: gpt-4o 或 claude-3-5-sonnet\n\n## 二、顶级 Prompt 技巧\n\n### 2.1 系统指令注入\n在 Custom Instructions 中写入:\n```\n你是一个顶级全栈架构师。\n1. 每次修改代码前必须先用工具读取相关文件结构\n2. 修改时直接输出完整替换块，不要只给 diff\n3. 遇到不确定的依赖先搜索官方文档，不要瞎编\n4. 所有代码必须包含错误处理和日志记录\n5. 优先使用成熟稳定的库，不要追新\n```\n\n### 2.2 任务拆解指令\n```\n请帮我完成以下任务，按步骤执行：\n\n1. 分析当前项目结构\n2. 创建 /api/chat 端点 (FastAPI)\n3. 编写对应的单元测试\n4. 生成 Dockerfile 和 docker-compose.yml\n5. 编写部署文档 README.md\n\n每完成一步请暂停，等我确认后再继续。\n```\n\n### 2.3 代码审查指令\n```\n请审查以下代码，指出：\n1. 潜在的安全漏洞\n2. 性能瓶颈\n3. 可维护性问题\n4. 改进建议\n\n[粘贴代码]\n```\n\n## 三、实战案例\n\n### 3.1 一键生成 CRUD\n对 Cline 说:\n> \"帮我创建一个用户管理系统，包含：\n> - User 模型 (id, email, password_hash, created_at)\n> - RESTful API (GET/POST/PUT/DELETE /users)\n> - JWT 认证\n> - 密码加密存储\n> 使用 FastAPI + SQLAlchemy + PostgreSQL\"\n\n### 3.2 自动写测试\n> \"为 /api/chat 端点编写完整的 pytest 测试用例，\n> 包含正常请求、参数缺失、认证失败等场景\"\n\n### 3.3 生成部署脚本\n> \"生成一键部署脚本 deploy.sh，要求：\n> 1. 检查 Docker 是否安装\n> 2. 拉取最新代码\n> 3. 构建镜像\n> 4. 启动容器\n> 5. 检查健康状态\"\n"
+      "tab_category": "藏经阁",
+      "short_comment": "虾小侠锐评：还在手动写 CRUD？让 AI 代理帮你干活！",
+      "full_markdown": "## 一、环境配置\n\n### 安装 Cursor\n1. 访问 https://cursor.sh 下载\n2. 安装后导入 VSCode 插件\n3. 登录账号\n\n### 安装 Cline 插件\n1. 打开 Cursor 插件市场\n2. 搜索 \"Cline\" 并安装\n3. 配置 API Key\n\n## 二、顶级 Prompt 技巧\n\n### 系统指令注入\n在 Custom Instructions 中写入:\n```\n你是一个顶级全栈架构师。\n1. 每次修改代码前必须先用工具读取相关文件结构\n2. 修改时直接输出完整替换块，不要只给 diff\n3. 遇到不确定的依赖先搜索官方文档，不要瞎编\n```\n\n### 任务拆解指令\n```\n请帮我完成以下任务，按步骤执行：\n1. 分析当前项目结构\n2. 创建 /api/chat 端点 (FastAPI)\n3. 编写对应的单元测试\n4. 生成 Dockerfile\n每完成一步请暂停，等我确认后再继续。\n```\n\n## 三、实战案例\n\n对 Cline 说:\n> \"帮我创建一个用户管理系统，包含 User 模型、RESTful API、JWT 认证，使用 FastAPI + PostgreSQL\"\n"
+    },
+    {
+      "title": "🔥 [练兵场] Cline - VSCode AI 代理一键部署",
+      "source_url": "https://github.com/cline/cline",
+      "tags": [
+        "实战作业",
+        "AI",
+        "部署指南"
+      ],
+      "tab_category": "练兵场",
+      "short_comment": "虾小侠锐评：今天不实操，明天又被割！3 分钟点火，自己动手！",
+      "full_markdown": "## 部署步骤\n\n### 1. 安装依赖\n```bash\n# 需要 Node.js 18+\nnpm install -g @anthropic-ai/claude-code\n```\n\n### 2. 配置 API Key\n```bash\n# 创建配置文件\nmkdir -p ~/.claude\necho '{\"apiKey\": \"sk-xxx\"}' > ~/.claude/config.json\n```\n\n### 3. 启动\n```bash\nclaude\n```\n\n### 4. 验证\n在 VSCode 中打开 Cline 插件，输入 `/test` 看是否响应\n\n### 常见问题\n- **端口占用**: 修改配置文件中的端口号\n- **API 限额**: 检查账户余额\n- **网络问题**: 配置代理\n"
+    },
+    {
+      "title": "🔥 [练兵场] OpenCode 本地沙盒极速点火",
+      "source_url": "https://github.com/opencode-ai/opencode",
+      "tags": [
+        "实战作业",
+        "AI",
+        "部署指南"
+      ],
+      "tab_category": "练兵场",
+      "short_comment": "虾小侠锐评：别光看文章，自己动手！Fork 仓库，填入 API，Vercel 一键部署！",
+      "full_markdown": "## 部署步骤\n\n### 1. Clone 仓库\n```bash\ngit clone https://github.com/opencode-ai/opencode.git\ncd opencode\n```\n\n### 2. 安装依赖\n```bash\npnpm install\n```\n\n### 3. 配置环境变量\n```bash\ncp .env.example .env\n# 编辑 .env，填入你的 API Key\n```\n\n### 4. 启动\n```bash\npnpm dev\n```\n\n### 5. 部署到 Vercel\n```bash\nvercel deploy\n```\n\n### 验证\n访问 http://localhost:3000，看到界面即成功\n"
     }
   ]
 }
