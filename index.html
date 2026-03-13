@@ -3,203 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤖 AI 情报日报 | 来财主控</title>
+    <title>🔴 CYBER-INTEL NEVUS | 赛博藏经阁</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'JetBrains Mono', 'Fira Code', monospace;
-            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
-            color: #e0e0e0;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .header {
-            text-align: center;
-            padding: 30px 0;
-            border-bottom: 2px solid #00ff88;
-            margin-bottom: 30px;
-        }
-        .header h1 {
-            font-size: 2.5em;
-            background: linear-gradient(90deg, #00ff88, #00d4ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 30px rgba(0, 255, 136, 0.3);
-        }
-        .header .subtitle {
-            color: #888;
-            margin-top: 10px;
-            font-size: 0.9em;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 20px;
-        }
-        .card {
-            background: rgba(20, 20, 35, 0.8);
-            border: 1px solid #333;
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        .card:hover {
-            transform: translateY(-5px);
-            border-color: #00ff88;
-            box-shadow: 0 10px 40px rgba(0, 255, 136, 0.2);
-        }
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 4px;
-            height: 100%;
-            background: linear-gradient(180deg, #00ff88, #00d4ff);
-        }
-        .card-title {
-            font-size: 1.2em;
-            color: #00ff88;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-        .card-meta {
-            font-size: 0.8em;
-            color: #666;
-            margin-bottom: 15px;
-            display: flex;
-            justify-content: space-between;
-        }
-        .card-content {
-            line-height: 1.6;
-            color: #ccc;
-            font-size: 0.95em;
-        }
-        .card-tags {
-            margin-top: 15px;
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .tag {
-            background: rgba(0, 255, 136, 0.1);
-            color: #00ff88;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 0.75em;
-            border: 1px solid rgba(0, 255, 136, 0.3);
-        }
-        .tag.high { background: rgba(255, 68, 68, 0.1); color: #ff4444; border-color: rgba(255, 68, 68, 0.3); }
-        .tag.medium { background: rgba(255, 187, 0, 0.1); color: #ffbb00; border-color: rgba(255, 187, 0, 0.3); }
-        .loading {
-            text-align: center;
-            padding: 50px;
-            color: #666;
-        }
-        .error {
-            text-align: center;
-            padding: 50px;
-            color: #ff4444;
-            border: 2px solid #ff4444;
-            border-radius: 12px;
-            margin: 20px;
-        }
-        .footer {
-            text-align: center;
-            padding: 30px;
-            color: #666;
-            font-size: 0.8em;
-            border-top: 1px solid #333;
-            margin-top: 40px;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        .live-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            background: #00ff88;
-            border-radius: 50%;
-            margin-right: 8px;
-            animation: pulse 2s infinite;
-        }
+        :root { --neon-cyan: #0ff; --neon-pink: #f0f; --neon-blue: #0088ff; --bg-dark: #050510; --glass-bg: rgba(10, 15, 30, 0.6); }
+        body { margin: 0; font-family: 'Fira Code', 'JetBrains Mono', monospace; background: var(--bg-dark); color: #fff; display: flex; flex-direction: column; min-height: 100vh; }
+        body::before { content: ''; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: radial-gradient(circle at 50% 50%, #1a0b2e 0%, #050510 100%); z-index: -1; }
+        .header { text-align: center; padding: 30px; border-bottom: 2px solid var(--neon-cyan); box-shadow: 0 0 20px rgba(0,255,255,0.2); background: var(--glass-bg); backdrop-filter: blur(10px); }
+        .header h1 { margin: 0; font-size: 2.5rem; text-shadow: 0 0 10px var(--neon-cyan); animation: breathe 3s infinite alternate; text-transform: uppercase; letter-spacing: 2px; }
+        @keyframes breathe { 0% { text-shadow: 0 0 5px var(--neon-cyan); } 100% { text-shadow: 0 0 20px var(--neon-cyan), 0 0 30px var(--neon-pink); } }
+        .nav-tabs { display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; padding: 20px; background: rgba(0,0,0,0.5); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .tab-btn { background: transparent; color: #888; border: 1px solid #444; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 1.1rem; font-weight: bold; transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; }
+        .tab-btn:hover { color: #fff; border-color: var(--neon-cyan); box-shadow: 0 0 10px var(--neon-cyan) inset; }
+        .tab-btn.active { color: #fff; border-color: var(--neon-pink); background: rgba(255,0,255,0.1); box-shadow: 0 0 15px var(--neon-pink); }
+        .container { padding: 40px 20px; flex: 1; max-width: 1400px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 25px; display: none; animation: fadeIn 0.5s ease-in-out; }
+        .grid.active { display: grid; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .glass-card { background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid rgba(0, 255, 255, 0.2); border-radius: 12px; padding: 25px; position: relative; overflow: hidden; transition: all 0.3s ease; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); display: flex; flex-direction: column; justify-content: space-between; }
+        .glass-card:hover { border-color: var(--neon-blue); box-shadow: 0 0 25px rgba(0,136,255,0.4); transform: translateY(-5px); }
+        .glass-card::before { content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent); transform: skewX(-25deg); transition: 0.5s; }
+        .glass-card:hover::before { left: 150%; }
+        .tag { display: inline-block; padding: 5px 12px; margin: 0 8px 15px 0; border-radius: 4px; font-size: 0.8rem; border: 1px solid; }
+        .tag-high { color: var(--neon-pink); border-color: var(--neon-pink); background: rgba(255,0,255,0.1); }
+        .tag-normal { color: var(--neon-cyan); border-color: var(--neon-cyan); background: rgba(0,255,255,0.1); }
+        .card-title { font-size: 1.3rem; color: #fff; margin-bottom: 15px; font-weight: bold; }
+        .card-desc { font-size: 0.95rem; line-height: 1.6; color: #b0c4de; margin-bottom: 20px; border-left: 2px solid var(--neon-cyan); padding-left: 15px; }
+        .card-meta { font-size: 0.85rem; color: #666; display: flex; justify-content: space-between; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 15px; }
+        #loader { text-align: center; color: var(--neon-cyan); padding: 50px; font-size: 1.5rem; animation: breathe 1s infinite alternate; width: 100%; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🤖 AI 情报日报</h1>
-        <div class="subtitle">
-            <span class="live-indicator"></span>
-            来财主控 · 自动聚合 · 实时更新
-        </div>
-        <div class="subtitle" id="last-update">最后更新：加载中...</div>
+        <h1>🌐 CYBER-INTEL NEVUS</h1>
+        <div id="timestamp" style="color: #888; font-size: 0.9rem; margin-top: 10px;">AWAITING DATALINK...</div>
+    </div>
+    
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('money')">📈 每日变现情报</button>
+        <button class="tab-btn" onclick="switchTab('library')">📚 赛博藏经阁</button>
+        <button class="tab-btn" onclick="switchTab('battle')">⚔️ 每日练兵场</button>
     </div>
 
     <div class="container">
-        <div id="content" class="grid">
-            <div class="loading">🔄 正在加载情报数据...</div>
-        </div>
-    </div>
-
-    <div class="footer">
-        <p>Powered by 来财 Agent | GitHub Pages 自动部署 | 数据源：来福机器人 (Aliyun)</p>
+        <div id="loader">ESTABLISHING SECURE CONNECTION...</div>
+        <div id="money" class="grid active"></div>
+        <div id="library" class="grid"></div>
+        <div id="battle" class="grid"></div>
     </div>
 
     <script>
-        async function loadIntel() {
-            try {
-                const response = await fetch('daily_intel.json');
-                if (!response.ok) throw new Error('数据加载失败');
-                const data = await response.json();
-                
-                const content = document.getElementById('content');
-                const lastUpdate = document.getElementById('last-update');
-                
-                // 更新时间
-                lastUpdate.textContent = `最后更新：${data.generated_at || '未知'}`;
-                
-                // 渲染卡片
-                if (data.intel && data.intel.length > 0) {
-                    content.innerHTML = data.intel.map(item => `
-                        <div class="card">
-                            <div class="card-title">${item.title || '无标题'}</div>
-                            <div class="card-meta">
-                                <span>📅 ${item.date || '未知日期'}</span>
-                                <span>🔖 ${item.source || '未知来源'}</span>
-                            </div>
-                            <div class="card-content">${item.summary || '无摘要'}</div>
-                            <div class="card-tags">
-                                ${item.tags ? item.tags.map(tag => 
-                                    `<span class="tag ${tag === '高危' ? 'high' : tag === '中危' ? 'medium' : ''}">${tag}</span>`
-                                ).join('') : ''}
-                            </div>
-                        </div>
-                    `).join('');
-                } else {
-                    content.innerHTML = '<div class="loading">📭 暂无情报数据</div>';
-                }
-            } catch (error) {
-                document.getElementById('content').innerHTML = `
-                    <div class="error">
-                        <h3>⚠️ 数据加载失败</h3>
-                        <p>${error.message}</p>
-                        <p style="margin-top:10px;font-size:0.9em">请检查 daily_intel.json 是否存在</p>
+        let intelData = {};
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.grid').forEach(grid => grid.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function renderCards(containerId, items) {
+            const container = document.getElementById(containerId);
+            if (!items || items.length === 0) {
+                container.innerHTML = '<div style="color:#666; text-align:center; width:100%; grid-column:1/-1;">NO DATA FRAGMENTS FOUND.</div>';
+                return;
+            }
+            container.innerHTML = items.map(item => `
+                <div class="glass-card">
+                    <div>
+                        <div>${item.tags.map(t => `<span class="tag ${t.includes('高危')||t.includes('实战')||t.includes('防坑')?'tag-high':'tag-normal'}">${t}</span>`).join('')}</div>
+                        <div class="card-title">${item.title}</div>
+                        <div class="card-desc">${item.summary}</div>
                     </div>
-                `;
+                    <div class="card-meta"><span>${item.source}</span><span>${item.date}</span></div>
+                </div>
+            `).join('');
+        }
+
+        async function loadData() {
+            try {
+                const res = await fetch('daily_intel.json?t=' + Date.now());
+                intelData = await res.json();
+                
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('timestamp').innerText = 'LAST SYNC: ' + intelData.generated_at + ' | NODE: ' + intelData.source;
+                
+                renderCards('money', intelData.money_intel);
+                renderCards('library', intelData.cyber_library);
+                renderCards('battle', intelData.battle_ground);
+            } catch (e) {
+                document.getElementById('loader').innerText = 'ERROR: DATALINK SEVERED. SIGNAL LOST.';
+                document.getElementById('loader').style.color = 'var(--neon-pink)';
             }
         }
-        
-        loadIntel();
-        // 每 5 分钟自动刷新
-        setInterval(loadIntel, 300000);
+
+        loadData();
+        setInterval(loadData, 60000);
     </script>
 </body>
 </html>
