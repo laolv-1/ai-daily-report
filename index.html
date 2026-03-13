@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🔴 CYBER-INTEL NEVUS | 双轨情报站</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <style>
         :root { --neon-cyan: #0ff; --neon-pink: #f0f; --neon-blue: #0088ff; --neon-green: #0f0; --bg-dark: #050510; --glass-bg: rgba(10, 15, 30, 0.6); }
         body { margin: 0; font-family: 'Fira Code', 'JetBrains Mono', monospace; background: var(--bg-dark); color: #fff; display: flex; flex-direction: column; min-height: 100vh; }
@@ -54,13 +55,35 @@
         <div class="main-tab" data-tab="情报" onclick="switchTab('情报',this)">💰 变现情报</div>
         <div class="main-tab" data-tab="藏经阁" onclick="switchTab('藏经阁',this)">📚 藏经阁</div>
         <div class="main-tab" data-tab="练兵场" onclick="switchTab('练兵场',this)">⚔️ 练兵场</div>
+        <div class="main-tab" data-tab="ARCH" onclick="switchTab('ARCH',this)">🌐 帝国全域架构</div>
     </div>
+
+    <!-- 架构 Tab 内容区 -->
+    <div class="container" id="archContainer" style="display:none;">
+        <div class="glass-card">
+            <div class="card-title">🌐 帝国全域架构（实时数据流向）</div>
+            <div class="card-short">US 主脑 → 来福中台 → HK 跳板 → GitHub Pages → 主公视线 / TG</div>
+            <div class="modal-markdown" style="white-space:pre-wrap;">
+                <pre class="mermaid" id="archDiagram">
+flowchart LR
+    A[US 主脑\n74.48.182.210\n来财 PM] -->|A2A 18800| B[来福中台\n100.82.179.92\n抓取/洗稿/生成]
+    B -->|SCP/JSON| C[HK 跳板\n100.119.68.81\nGitHub 推送]
+    C -->|GitHub API| D[GitHub Pages\n情报大屏]
+    B -->|TG Bot 直推| E[主公 Telegram]
+    A -->|指令 /top10_scripts| B
+    D -->|可视化查询| E
+                </pre>
+            </div>
+        </div>
+    </div>
+
     <div class="tag-wall-container"><div class="tag-wall" id="tagWall"></div></div>
     <div class="search-container"><div class="search-box"><input type="text" id="searchInput" placeholder="> 搜索关键词..." oninput="filterData()"></div></div>
     <div class="container"><div id="grid" class="grid"><div id="loader">🔄 LOADING...</div></div></div>
     <div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()"><div class="modal-content"><button class="close-btn" onclick="closeModal()">&times;</button><div id="mTags"></div><div class="modal-title" id="mTitle"></div><div class="card-short" id="mShort"></div><div class="modal-markdown" id="mMarkdown"></div><a href="#" target="_blank" class="action-btn" id="mLink">🔗 原文链接</a></div></div>
     <script>
 let data=[],curTab='ALL',curTag='ALL';
+mermaid.initialize({ startOnLoad: true, theme: 'dark' });
 async function load(){
     const l=document.getElementById('loader'),g=document.getElementById('grid');
     try{
@@ -87,6 +110,21 @@ function switchTab(tab,el){
     document.querySelectorAll('.main-tab').forEach(e=>e.classList.remove('active'));
     el.classList.add('active');
     curTab=tab;curTag='ALL';
+
+    // ARCH Tab: 只显示架构图
+    if(tab==='ARCH'){
+        document.getElementById('archContainer').style.display='block';
+        document.querySelector('.tag-wall-container').style.display='none';
+        document.querySelector('.search-container').style.display='none';
+        document.querySelector('.container #grid').parentElement.style.display='none';
+        return;
+    }else{
+        document.getElementById('archContainer').style.display='none';
+        document.querySelector('.tag-wall-container').style.display='block';
+        document.querySelector('.search-container').style.display='block';
+        document.querySelector('.container #grid').parentElement.style.display='block';
+    }
+
     document.querySelectorAll('.filter-tag').forEach(e=>e.classList.remove('active'));
     document.querySelector('.filter-tag').classList.add('active');
     updateTags(data);
