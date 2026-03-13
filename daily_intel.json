@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-03-13 22:30:00 GMT+8",
+  "source": "来福机器人 (Aliyun 100.82.179.92)",
+  "intel": [
+    {
+      "title": "🚨 GPT-5.3 架构泄露：O1 级推理能力下放",
+      "date": "2026-03-13",
+      "source": "GitHub/Twitter 聚合",
+      "summary": "OpenAI 内部文档泄露显示 GPT-5.3 将集成 O1 的完整推理链，Q2 发布。关键突破：多步数学推理准确率提升至 94%，代码生成支持 10 万 token 上下文。",
+      "tags": ["高危", "AI 模型", "OpenAI"]
+    },
+    {
+      "title": "💰 币安新上币：SOL 生态 Meme 币暴涨 300%",
+      "date": "2026-03-13",
+      "source": "CoinGecko API",
+      "summary": "$WIF 宣布上线币安创新区，24 小时交易量突破 5 亿美元。链上数据显示巨鲸地址累计买入 1200 万枚，疑似庄家控盘。",
+      "tags": ["中危", "加密货币", "Solana"]
+    },
+    {
+      "title": "🔐 重大漏洞：Cloudflare CDN 缓存投毒攻击",
+      "date": "2026-03-12",
+      "source": "Security Weekly",
+      "summary": "研究人员发现 Cloudflare CDN 存在缓存投毒漏洞，攻击者可注入恶意 JS。影响范围：使用 Cloudflare 缓存的 20% 头部网站。CVE-2026-1847 已分配。",
+      "tags": ["高危", "网络安全", "Cloudflare"]
+    },
+    {
+      "title": "📱 华为鸿蒙 NEXT 正式版推送：纯血鸿蒙时代来临",
+      "date": "2026-03-12",
+      "source": "华为开发者大会",
+      "summary": "鸿蒙 NEXT 正式版开始推送，彻底移除 AOSP 代码。首批支持 Mate 60 系列、Pura 70 系列。开发者反馈：API 迁移成本较高，但性能提升 40%。",
+      "tags": ["科技", "华为", "操作系统"]
+    },
+    {
+      "title": "🤖 特斯拉 Optimus Gen-3 工厂实测视频流出",
+      "date": "2026-03-11",
+      "source": "YouTube/Twitter",
+      "summary": "德州超级工厂内部视频显示 Optimus Gen-3 已实现 95% 装配线自动化。关键升级：触觉传感器精度提升 10 倍，电池续航达 12 小时。马斯克预计 Q4 开始对外销售。",
+      "tags": ["AI 机器人", "特斯拉", "制造业"]
+    }
+  ]
+}
