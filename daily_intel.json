@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-03-14 02:36:03 GMT+8",
-  "source": "来福双轨引擎 v5.0 (情报 + 藏经阁 + 练兵场)",
+  "generated_at": "2026-03-15 01:11:57 GMT+8",
+  "source": "来福双轨引擎 v5.0 + spider_v3 正文深度抓取 (门槛55分)",
   "intel": [
     {
       "title": "💸 [割韭菜预警] 小红书『AI 绘图月入十万』教程大起底",
@@ -39,6 +39,60 @@
       "full_markdown": "## 无人直播玩法\n\n### 核心思路\n1. 用 AI 生成虚拟主播 (D-ID/Synthesia)\n2. 录制产品介绍视频循环播放\n3. 挂载小黄车，自动成交\n\n### 成本核算\n- AI 主播生成：$30/月 (D-ID)\n- TikTok 小店保证金：$500\n- 预期收益：头部玩家日销$1000+\n\n### 操作步骤\n1. 注册 TikTok Shop (需要海外主体)\n2. 选品：1688 一件代发\n3. 用 AI 生成 100 条产品视频\n4. 设置循环直播，24 小时不间断\n\n### 风险提示\n- TikTok 可能封禁无人直播账号\n- 需要准备多个账号矩阵\n- 选品要避免侵权\n"
     },
     {
+      "title": "🔥 [练兵场] Cline - VSCode AI 代理一键部署",
+      "source_url": "https://github.com/cline/cline",
+      "tags": [
+        "实战作业",
+        "AI",
+        "部署指南"
+      ],
+      "tab_category": "练兵场",
+      "short_comment": "虾小侠锐评：今天不实操，明天又被割！3 分钟点火，自己动手！",
+      "full_markdown": "## 部署步骤\n\n### 1. 安装依赖\n```bash\n# 需要 Node.js 18+\nnpm install -g @anthropic-ai/claude-code\n```\n\n### 2. 配置 API Key\n```bash\n# 创建配置文件\nmkdir -p ~/.claude\necho '{\"apiKey\": \"sk-xxx\"}' > ~/.claude/config.json\n```\n\n### 3. 启动\n```bash\nclaude\n```\n\n### 4. 验证\n在 VSCode 中打开 Cline 插件，输入 `/test` 看是否响应\n\n### 常见问题\n- **端口占用**: 修改配置文件中的端口号\n- **API 限额**: 检查账户余额\n- **网络问题**: 配置代理\n"
+    },
+    {
+      "title": "🔥 [练兵场] OpenCode 本地沙盒极速点火",
+      "source_url": "https://github.com/opencode-ai/opencode",
+      "tags": [
+        "实战作业",
+        "AI",
+        "部署指南"
+      ],
+      "tab_category": "练兵场",
+      "short_comment": "虾小侠锐评：别光看文章，自己动手！Fork 仓库，填入 API，Vercel 一键部署！",
+      "full_markdown": "## 部署步骤\n\n### 1. Clone 仓库\n```bash\ngit clone https://github.com/opencode-ai/opencode.git\ncd opencode\n```\n\n### 2. 安装依赖\n```bash\npnpm install\n```\n\n### 3. 配置环境变量\n```bash\ncp .env.example .env\n# 编辑 .env，填入你的 API Key\n```\n\n### 4. 启动\n```bash\npnpm dev\n```\n\n### 5. 部署到 Vercel\n```bash\nvercel deploy\n```\n\n### 验证\n访问 http://localhost:3000，看到界面即成功\n"
+    },
+    {
+      "title": "📚 【藏经阁】DigitalOcean Docker Tutorial",
+      "source_url": "https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-22-04",
+      "tab_category": "藏经阁",
+      "tags": [
+        "Docker",
+        "Linux",
+        "运维"
+      ],
+      "score": 75,
+      "short_comment": "技术干货长文，全量正文 10000 字。核心内容已提炼入库。",
+      "full_markdown": "## DigitalOcean Docker Tutorial\n\n**原文来源:** https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-22-04\n\n**全量正文（10000字）:**\n\nByBrian Hogan,Tony Tran,Anish Singh WaliaandVinayak Baranwal\nDockersimplifies managing application processes incontainers—resource-isolated environments that are more portable and resource-efficient than virtual machines.\nFor a detailed introduction to the different components of a Docker container, check outThe Docker Ecosystem: An Introduction to Common Components.\nThis tutorial covers installing Docker Community Edition (CE) on Ubuntu, working with containers and images, pushing images to Docker Hub, and managing container lifecycles. It also includes GPU support installation, troubleshooting common errors, and security best practices.\nSimplify deploying applications withDigitalOcean App Platform. Deploy directly from GitHub in minutes.\nInstall Docker from the official repository by adding Docker’s GPG key and repository, then installdocker-ceusingaptto get the latest version.\nYou can run Docker without sudo by adding your user to thedockergroup withsudo usermod -aG docker ${USER}and then logging out and back in.\nManage containers and images using commands likedocker run,docker ps,docker stop,docker rm, anddocker imagesto create, list, stop, and remove containers, and view images.\nCommit changes made in a container to a new image withdocker commitand push them to Docker Hub usingdocker pushfor use on other systems.\nEnable GPU support by installingnvidia-container-toolkitand use the--gpusflag when running containers needing GPU access.\nTo follow this tutorial, you will need the following:\nOne Ubuntu server set up by followingthe Ubuntu initial server setup guide(compatible with Ubuntu 20.04 and later versions), including asudonon-rootuser and a firewall.\nAn account onDocker Hubif you wish to create your own images and push them to Docker Hub, as shown in Steps 7 and 8.\nStep 1 — Installing Docker\nThe Docker installation package available in the official Ubuntu repository may not be the latest version. To ensure we get the latest version, we’ll install Docker from the official Docker repository. To do that, we’ll add a new package source, add the GPG key from Docker to ensure the downloads are valid, and then install the package.\nFirst, update your existing list of packages:\nNext, install a few prerequisite packages which letaptuse packages over HTTPS:\nsudoaptinstallca-certificatescurlgnupg\nThen add the GPG key for the official Docker repository to your system:\nsudoinstall-m0755-d/etc/apt/keyringscurl-fsSLhttps://download.docker.com/linux/ubuntu/gpg|sudogpg--dearmor-o/etc/apt/keyrings/docker.gpgsudochmoda+r /etc/apt/keyrings/docker.gpg\nAdd the Docker repository to APT sources:\necho\"deb [arch=$(dpkg --print-architecture)signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu$(lsb_release-cs)stable\"|sudotee/etc/apt/sources.list.d/docker.list>/dev/null\nUpdate your existing list of packages again for the addition to be recognized:\nMake sure you are about to install from the Docker repo instead of the default Ubuntu repo:\napt-cachepolicy docker-ce\nYou’ll see output like this, although the version number for Docker may be different:\ndocker-ce:\n  Installed:(none)Candidate:5:20.10.14~3-0~ubuntu-jammy\n  Version table:5:20.10.14~3-0~ubuntu-jammy500500https://download.docker.com/linux/ubuntu jammy/stable amd64 Packages5:20.10.13~3-0~ubuntu-jammy500500https://download.docker.com/linux/ubuntu jammy/stable amd64 Packages\nNotice thatdocker-ceis not installed, but the candidate for installation is from the Docker repository for Ubuntu.\nFinally, install Docker:\nsudoaptinstalldocker-ce\nDocker should now be installed, the daemon started, and the process enabled to start on boot. Check that it’s running:\nsudosystemctl statusdocker\nThe output should be similar to the following, showing that the service is active and running:\n● docker.service - Docker Application Container Engine\n     Loaded: loaded(/lib/systemd/system/docker.service;enabled;vendor preset: enabled)Active: active(running)since Fri2022-04-0121:30:25 UTC;22s ago\nTriggeredBy: ● docker.socket\n       Docs: https://docs.docker.com\n   Main PID:7854(dockerd)Tasks:7Memory:38.3M\n        CPU: 340ms\n     CGroup: /system.slice/docker.service\n             └─7854 /usr/bin/dockerd-Hfd://--containerd=/run/containerd/containerd.sock\nInstalling Docker now gives you not just the Docker service (daemon) but also thedockercommand line utility, or the Docker client. We’ll explore how to use thedockercommand later in this tutorial.\nStep 2 — Executing the Docker Command Without Sudo (Optional)\nBy default, thedockercommand can only be run by therootuser or by a user in thedockergroup, which is automatically created during Docker’s installation process. If you attempt to run thedockercommand without prefixing it withsudoor without being in thedockergroup, you’ll get an output like this:\ndocker: Cannot connect to the Docker daemon. Is thedockerdaemon running on this host?.\nSee'docker run --help'.\nIf you want to avoid typingsudowhenever you run thedockercommand, add ",
+      "generated_at": "2026-03-15 01:11:19",
+      "prompt_input_chars": 10000
+    },
+    {
+      "title": "📚 【藏经阁】Linux Journey",
+      "source_url": "https://linuxjourney.com/lesson/the-shell",
+      "tab_category": "藏经阁",
+      "tags": [
+        "Linux",
+        "教程",
+        "基础"
+      ],
+      "score": 75,
+      "short_comment": "技术干货长文，全量正文 1802 字。核心内容已提炼入库。",
+      "full_markdown": "## Linux Journey\n\n**原文来源:** https://linuxjourney.com/lesson/the-shell\n\n**全量正文（1802字）:**\n\n2.pwd (Print Working Directory)\n3.cd (Change Directory)\n4.ls (List Directories)\n12.mkdir (Make Directory)\nWhat is the Linux Shell\nWelcome to yourLinux journey! The first step is understanding theLinux shell. The shell is a powerful program that accepts your typed commands and passes them to the operating system to execute. If you've used a graphical user interface (GUI), you might have encountered applications like \"Terminal\" or \"Console.\" These are simply programs that open a shell session for you. Throughout this course, we will explore the capabilities of the shell and the manyLinux commandsavailable.\nFor this course, we will focus on the Bash (Bourne Again Shell) program. Bash is the default shell for most Linux distributions, making it an essential tool to learn. While other shells likeksh,zsh, andtschexist, mastering Bash provides a solid foundation for working with any Linux system.\nWhen you open a terminal, you'll be greeted by the shell prompt. Its appearance can vary between distributions, but it typically follows this format:username@hostname:current_directory$.\npete@icebox:/home/pete $\nThe$symbol at the end indicates that the shell is ready to accept commands from a regular user. You do not type this symbol when entering commands; it is purely informational.\nYour First Linux Command\nLet's start with one of the mostbasic Linux commands for beginners:echo. This command is straightforward—it simply displays, or \"echoes,\" the text you provide as arguments back to the terminal.\nSign in to save your learning progress\nWe recommend exploring the comprehensiveShell Learning Pathto practice related skills and concepts.\nWhat is the exact output to the display when you type `echo Hello World`? Please answer in English, paying close attention to capitalization and spacing.",
+      "generated_at": "2026-03-15 01:11:24",
+      "prompt_input_chars": 1802
+    },
+    {
       "title": "🐳 [服务器基建] Docker 容器一键部署与防坑指南",
       "source_url": "https://docs.docker.com/get-started/",
       "tags": [
@@ -73,30 +127,6 @@
       "tab_category": "藏经阁",
       "short_comment": "虾小侠锐评：还在手动写 CRUD？让 AI 代理帮你干活！",
       "full_markdown": "## 一、环境配置\n\n### 安装 Cursor\n1. 访问 https://cursor.sh 下载\n2. 安装后导入 VSCode 插件\n3. 登录账号\n\n### 安装 Cline 插件\n1. 打开 Cursor 插件市场\n2. 搜索 \"Cline\" 并安装\n3. 配置 API Key\n\n## 二、顶级 Prompt 技巧\n\n### 系统指令注入\n在 Custom Instructions 中写入:\n```\n你是一个顶级全栈架构师。\n1. 每次修改代码前必须先用工具读取相关文件结构\n2. 修改时直接输出完整替换块，不要只给 diff\n3. 遇到不确定的依赖先搜索官方文档，不要瞎编\n```\n\n### 任务拆解指令\n```\n请帮我完成以下任务，按步骤执行：\n1. 分析当前项目结构\n2. 创建 /api/chat 端点 (FastAPI)\n3. 编写对应的单元测试\n4. 生成 Dockerfile\n每完成一步请暂停，等我确认后再继续。\n```\n\n## 三、实战案例\n\n对 Cline 说:\n> \"帮我创建一个用户管理系统，包含 User 模型、RESTful API、JWT 认证，使用 FastAPI + PostgreSQL\"\n"
-    },
-    {
-      "title": "🔥 [练兵场] Cline - VSCode AI 代理一键部署",
-      "source_url": "https://github.com/cline/cline",
-      "tags": [
-        "实战作业",
-        "AI",
-        "部署指南"
-      ],
-      "tab_category": "练兵场",
-      "short_comment": "虾小侠锐评：今天不实操，明天又被割！3 分钟点火，自己动手！",
-      "full_markdown": "## 部署步骤\n\n### 1. 安装依赖\n```bash\n# 需要 Node.js 18+\nnpm install -g @anthropic-ai/claude-code\n```\n\n### 2. 配置 API Key\n```bash\n# 创建配置文件\nmkdir -p ~/.claude\necho '{\"apiKey\": \"sk-xxx\"}' > ~/.claude/config.json\n```\n\n### 3. 启动\n```bash\nclaude\n```\n\n### 4. 验证\n在 VSCode 中打开 Cline 插件，输入 `/test` 看是否响应\n\n### 常见问题\n- **端口占用**: 修改配置文件中的端口号\n- **API 限额**: 检查账户余额\n- **网络问题**: 配置代理\n"
-    },
-    {
-      "title": "🔥 [练兵场] OpenCode 本地沙盒极速点火",
-      "source_url": "https://github.com/opencode-ai/opencode",
-      "tags": [
-        "实战作业",
-        "AI",
-        "部署指南"
-      ],
-      "tab_category": "练兵场",
-      "short_comment": "虾小侠锐评：别光看文章，自己动手！Fork 仓库，填入 API，Vercel 一键部署！",
-      "full_markdown": "## 部署步骤\n\n### 1. Clone 仓库\n```bash\ngit clone https://github.com/opencode-ai/opencode.git\ncd opencode\n```\n\n### 2. 安装依赖\n```bash\npnpm install\n```\n\n### 3. 配置环境变量\n```bash\ncp .env.example .env\n# 编辑 .env，填入你的 API Key\n```\n\n### 4. 启动\n```bash\npnpm dev\n```\n\n### 5. 部署到 Vercel\n```bash\nvercel deploy\n```\n\n### 验证\n访问 http://localhost:3000，看到界面即成功\n"
     }
   ]
 }
