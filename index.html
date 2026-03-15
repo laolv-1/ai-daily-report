@@ -66,12 +66,12 @@
             <div class="modal-markdown" style="white-space:pre-wrap;">
                 <pre class="mermaid" id="archDiagram">
 flowchart LR
-    A[US 主脑\n74.48.182.210\n来财 PM] -->|A2A 18800| B[来福中台\n100.82.179.92\n抓取/洗稿/生成]
-    B -->|SCP/JSON| C[HK 跳板\n100.119.68.81\nGitHub 推送]
-    C -->|GitHub API| D[GitHub Pages\n情报大屏]
-    B -->|TG Bot 直推| E[主公 Telegram]
-    A -->|指令 /top10_scripts| B
-    D -->|可视化查询| E
+    US_Node["US Master Brain<br/>74.48.182.210<br/>Laicai PM2"] -->|"A2A Port 18800"| LF_Node["Laifu Middle Node<br/>100.82.179.92<br/>Spider + LLM Clean"]
+    LF_Node -->|"Push JSON"| HK_Node["HK Bridge<br/>100.119.68.81<br/>GitHub Sync"]
+    HK_Node -->|"GitHub API"| GH_Pages["GitHub Pages<br/>Intel Dashboard"]
+    LF_Node -->|"TG Bot API"| TG_User["Master Telegram<br/>Receive Report"]
+    US_Node -->|"CMD /top10_scripts"| LF_Node
+    GH_Pages -->|"Visual Query"| TG_User
                 </pre>
             </div>
         </div>
