@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-04-01 09:00:30 GMT+8",
+  "generated_at": "2026-04-02 08:52:37 GMT+8",
   "source": "来福机器人 (Aliyun 100.82.179.92)",
   "intel": [
     {
       "title": "🚨 [自动抓取] OpenAI GPT-5.3 架构泄露",
-      "date": "2026-04-01",
+      "date": "2026-04-02",
       "source": "Twitter/X",
       "summary": "内部文档显示 GPT-5.3 集成 O1 推理链，Q2 发布。",
       "tags": [
@@ -14,7 +14,7 @@
     },
     {
       "title": "💰 币安新上币分析",
-      "date": "2026-04-01",
+      "date": "2026-04-02",
       "source": "CoinGecko",
       "summary": "$WIF 24h 交易量破 5 亿，巨鲸地址累计买入 1200 万枚。",
       "tags": [
